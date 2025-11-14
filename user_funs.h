@@ -9,4 +9,11 @@ matrix ff1T(matrix, matrix = NAN, matrix = NAN);
 long long fib_num(int k);
 matrix ff1S(double, matrix, matrix = NAN, matrix = NAN);
 matrix ff1C(matrix, matrix = NAN, matrix = NAN);
+matrix gram_schmidt(const matrix& Q_star, int n);
+matrix ff2T(matrix x, matrix ud1, matrix ud2);
+
+
+
+
+
 

@@ -1,4 +1,5 @@
 #include"opt_alg.h"
+#include"user_funs.h"
 
 solution MC(matrix(*ff)(matrix, matrix, matrix), int N, matrix lb, matrix ub, double epsilon, int Nmax, matrix ud1, matrix ud2)
 {
@@ -371,17 +372,110 @@ solution HJ_trial(matrix(*ff)(matrix, matrix, matrix), solution XB, double s, ma
 
 solution Rosen(matrix(*ff)(matrix, matrix, matrix), matrix x0, matrix s0, double alpha, double beta, double epsilon, int Nmax, matrix ud1, matrix ud2)
 {
-	try
-	{
-		solution Xopt;
-		//Tu wpisz kod funkcji
+try
+    {
+       solution Xopt;
+       int n = get_len(x0);
+       solution::clear_calls();
 
-		return Xopt;
-	}
-	catch (string ex_info)
-	{
-		throw ("solution Rosen(...):\n" + ex_info);
-	}
+       int i = 0;
+
+       matrix D = ident_mat(n); // D(i) przechowuje kierunki d_j(i) jako kolumny
+       matrix Lambda(n, 1, 0.0);
+       matrix P(n, 1, 0.0);
+       solution xB(x0); // xB to wektor n x 1, przechowuje najlepszy punkt w bie¿¹cej iteracji
+
+       xB.fit_fun(ff, ud1, ud2);
+
+       matrix S = s0; // Wektor d³ugoœci kroków s(i)
+
+       int exit_flag = -1;
+
+       do
+       {
+           double max_s_abs = 0.0;
+           for (int j = 0; j < n; ++j) {
+               max_s_abs = std::max(max_s_abs, std::abs(S(j)));
+           }
+           if (max_s_abs < epsilon) {
+               exit_flag = 2; // Zbie¿noœæ
+               break;
+           }
+
+           solution x_prev = xB;
+           int successful_steps = 0; // Licznik udanych kroków w pêtli wewnêtrznej
+
+           for (int j = 0; j < n; ++j)
+           {
+           		// Aktualny kierunek d_j(i) i d³ugoœæ kroku s_j(i)
+	           matrix dj = get_col(D, j);
+	           double sj = S(j);
+
+	           solution x_new(xB.x + dj * sj);
+	           x_new.fit_fun(ff, ud1, ud2);
+
+	           if (x_new.y < xB.y)
+	           {
+	               xB = x_new;
+	               Lambda(j) += sj;
+	               S(j) *= alpha;
+	               successful_steps++; //???
+	           }
+	           else
+	           {
+	               S(j) *= (-beta);
+	               P(j) += 1.0;
+	           }
+           }
+
+           i++;
+           bool re_orthogonalize = false;
+           for (int j = 0; j < n; ++j) {
+               if (std::abs(Lambda(j)) >= 1e-12 && P(j) >= 1.0) { // Pj musi byæ wiêksze lub równe 1
+                   re_orthogonalize = true;
+                   break;
+               }
+           }
+
+           if (re_orthogonalize)
+           {
+               matrix L(n, n, 0.0);
+               for (int j = 0; j < n; ++j) {
+                   for (int k = 0; k <= j; ++k) {
+                       L(j, k) = Lambda(k);
+                   }
+               }
+
+               // Q(i) = D(i) * L. D(i) to aktualna macierz D
+               matrix Q = D * L;
+
+               matrix Q_star = Q;
+
+               D = gram_schmidt(Q_star, n);
+
+               Lambda = matrix(n, 1, 0.0);
+               P = matrix(n, 1, 0.0);
+               S = s0;
+           }
+
+           if (solution::f_calls > Nmax)
+           {
+               exit_flag = 0; // Przekroczenie Nmax
+               break;
+           }
+
+       }
+       while (true);
+
+       Xopt = xB;
+       Xopt.flag = exit_flag;
+
+       return Xopt;
+    }
+    catch (string ex_info)
+    {
+       throw ("solution Rosen(...):\n" + ex_info);
+    }
 }
 
 solution pen(matrix(*ff)(matrix, matrix, matrix), matrix x0, double c, double dc, double epsilon, int Nmax, matrix ud1, matrix ud2)

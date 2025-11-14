@@ -76,7 +76,6 @@ matrix ff1S(double t, matrix Y, matrix ud1, matrix ud2) {
 	double VB = Y(2);
 	double TB = Y(3);
 
-	// ud1 = [DA] w m^2 (poprawnie ustawione przez wywo³uj¹cego)
 	double DA = m2d(ud1);
 
 	// zabezpieczenia
@@ -127,7 +126,6 @@ matrix ff1S(double t, matrix Y, matrix ud1, matrix ud2) {
 	return dY;
 }
 
-
 matrix ff1C(matrix x, matrix ud1, matrix ud2) {
 	// x = [DA] w [cm^2]
 	double DA_cm2 = m2d(x);
@@ -172,7 +170,63 @@ matrix ff1C(matrix x, matrix ud1, matrix ud2) {
 	return matrix(objective_value);
 }
 
+matrix gram_schmidt(const matrix& Q_star, int n)
+{
+    matrix D_next(n, n);
 
+    matrix v1 = get_col(Q_star, 0);
+
+    double norm_v1 = norm(v1);
+    if (std::abs(norm_v1) < 1e-12) {
+        v1 = matrix(n, 1);
+        v1(0) = 1.0;
+        norm_v1 = norm(v1);
+    }
+    matrix d1 = v1 * (1.0 / norm_v1);
+    D_next.set_col(d1, 0);
+
+    for (int j = 1; j < n; ++j)
+    {
+        matrix vj = get_col(Q_star, j);
+
+        for (int k = 0; k < j; ++k)
+        {
+            matrix dk = get_col(D_next, k);
+            matrix product = trans(vj) * dk;
+            double scalar = m2d(product);
+
+            vj = vj - dk * scalar;
+        }
+
+        double norm_vj = norm(vj);
+        if (std::abs(norm_vj) < 1e-12) {
+            matrix ej = matrix(n, 1);
+            ej((j+1) % n) = 1.0;
+            D_next.set_col(ej, j);
+
+        } else {
+            matrix dj = vj * (1.0 / norm_vj);
+            D_next.set_col(dj, j);
+        }
+    }
+
+    return D_next;
+}
+
+matrix ff2T(matrix x, matrix ud1, matrix ud2)
+{
+	double x1 = x(0);
+	double x2 = x(1);
+
+	const double PI = 3.14159265358979323846;
+
+	double y = x1 * x1 + x2 * x2
+			 - std::cos(2.5 * PI * x1)
+			 - std::cos(2.5 * PI * x2)
+			 + 2.0;
+
+	return matrix(y);
+}
 
 
 

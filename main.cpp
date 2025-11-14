@@ -25,7 +25,8 @@ int main()
 	try
 	{
 		//lab0();
-		lab1();
+		//lab1();
+		lab2();
 	}
 	catch (string EX_INFO)
 	{
@@ -120,7 +121,7 @@ void lab1()
 
 	// Model rzeczwisty
 
-	/*
+
 
 	// --- CZÊŒÆ 1: TESTOWANIE MODELU ---
     cout << "--- TEST MODELU ZBIORNIKOW ---" << endl;
@@ -147,7 +148,6 @@ void lab1()
         if (TB_history(i) > max_TB) max_TB = TB_history(i);
     }
 
-    // POPRAWKA: Pe³ne zwalnianie pamiêci, tak jak w lab0
     Y_sim[0].~matrix();
     Y_sim[1].~matrix();
 
@@ -164,7 +164,7 @@ void lab1()
     double b_start = 100.0;
     double epsilon = 1e-3;
     double gamma = 1e-3;
-    int Nmax = 500; // Zmniejszono Nmax, bo symulacje s¹ kosztowne
+    int Nmax = 500;
 
     // 1. U¿ycie metody LAGRANGE'A
     solution::clear_calls();
@@ -188,10 +188,11 @@ void lab1()
     cout << "Wartosc funkcji celu f(DA): " << m2d(opt_fib.y) << endl;
     cout << "Liczba wywolan f. celu: " << solution::f_calls << endl;
 
-	*/
+
 
 	//Symulacja z optymalnymi wynikami
 
+	/*
 	// ??????????? ???????? DA, ????????? ? ??????? (? ??^2)
 	const double DA_OPT_FIB_CM2 = 18.8536;
 	const double DA_OPT_LAG_CM2 = 20.138;
@@ -279,17 +280,59 @@ void lab1()
 	    std::cerr << "Blad w trakcie zapisu pliku: " << ex_info << std::endl;
 	}
 
-// ----------------------------------------------------------------------
-// 3. ???????????? ??????
-// ----------------------------------------------------------------------
-delete[] Y_sim_FIB;
-delete[] Y_sim_LAG;
-
+	// ----------------------------------------------------------------------
+	// 3. ???????????? ??????
+	// ----------------------------------------------------------------------
+	delete[] Y_sim_FIB;
+	delete[] Y_sim_LAG;
+	*/
 }
 
 void lab2()
 {
+	try
+	{
+		// Funkcja testowa
 
+		solution::clear_calls();
+
+		int N = 2;
+
+		double x0_data[] = { 0.4, -0.4 }; // Punkt startowy
+		matrix x0(N, x0_data);
+
+		double s0_data[] = { 0.1, 0.1 }; // Pocz¹tkowe kroki
+		matrix s0(N, s0_data);
+
+		double alpha = 3.0;     // Wspó³czynnik ekspansji
+		double beta = 0.5;      // Wspó³czynnik kontrakcji
+		double epsilon = 1e-4;  // Dok³adnoœæ
+		int Nmax = 1000;        // Maksymalna liczba wywo³añ funkcji celu
+
+		matrix ud1(NAN), ud2(NAN);
+
+		std::cout << "--- Rozpoczêcie optymalizacji metod¹ Rosenbrocka ---\n";
+		std::cout << "Punkt startowy x0: " << x0 << "\n";
+
+		solution Xopt = Rosen(ff2T, x0, s0, alpha, beta, epsilon, Nmax, ud1, ud2);
+
+		std::cout << "\n--- Wyniki optymalizacji ---\n";
+		std::cout << Xopt;
+
+		std::cout << "\nKomentarz do flagi wyjœcia:\n";
+		if (Xopt.flag == 2) {
+			std::cout << "Flaga 2: Algorytm zbieg³ do rozwi¹zania z zadan¹ dok³adnoœci¹ (max(|s_j|) < epsilon).\n";
+		} else if (Xopt.flag == 0) {
+			std::cout << "Flaga 0: Przekroczono maksymaln¹ liczbê wywo³añ funkcji celu (Nmax).\n";
+		} else {
+			std::cout << "Flaga " << Xopt.flag << ": Nieznany status wyjœcia.\n";
+		}
+
+	}
+	catch (string ex_info)
+	{
+		std::cerr << "Wyst¹pi³ b³¹d w run_rosen_test():\n" << ex_info << "\n";
+	}
 }
 
 void lab3()
