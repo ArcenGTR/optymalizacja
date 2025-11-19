@@ -16,8 +16,9 @@ Data ostatniej modyfikacji: 30.09.2025
 
 void lab0();
 void lab1();
-void lab2();
+void lab2_rosen();
 void lab2_HJ();
+void lab2_robot();
 void lab3();
 void lab4();
 void lab5();
@@ -27,8 +28,9 @@ int main()
 {
 	try
 	{
-		//lab2();
-		lab2_HJ();
+		lab2_rosen();
+		lab2_HJ();      // 100 optymalizacji dla funkcji testowej ff2T
+		//lab2_robot();   // Optymalizacja ramienia robota
 	}
 	catch (string EX_INFO)
 	{
@@ -98,73 +100,280 @@ void lab1()
 
 
 
-void lab2()
+void lab2_rosen()
 {
 	try
 	{
-		// Funkcja testowa
-
-		solution::clear_calls();
+		std::cout << "\n=== Lab2 Rosenbrock - 3x100 optymalizacji ===" << std::endl;
 
 		int N = 2;
-
-		double x0_data[] = { 0.4, -0.4 }; // Punkt startowy
-		matrix x0(N, x0_data);
-
-		double s0_data[] = { 0.1, 0.1 }; // Poczatkowe kroki
-		matrix s0(N, s0_data);
-
-		double alpha = 3.0;     // Wspólczynnik ekspansji
-		double beta = 0.5;      // Wspólczynnik kontrakcji
-		double epsilon = 1e-4;  // Dokladnosc
-		int Nmax = 1000;        // Maksymalna liczba wywolan funkcji celu
-
+		double alpha = 2.0;     // Współczynnik ekspansji (powinien być >1)
+		double beta = 0.5;      // Współczynnik kontrakcji (powinien być <1)
+		double epsilon = 1e-6;  // Dokładność
+		int Nmax = 10000;       // Maksymalna liczba wywołań funkcji celu
 		matrix ud1(NAN), ud2(NAN);
 
-		std::cout << "--- Rozpoczecie optymalizacji metoda Rosenbrocka ---\n";
-		std::cout << "Punkt startowy x0: " << x0 << "\n";
+		// Trzy różne długości kroku
+		double step_sizes[3][2] = { {0.1, 0.1}, {0.5, 0.5}, {1.0, 1.0} };
+		int num_steps = 3;
+		int num_trials = 100;
 
-		solution Xopt = Rosen(ff2T, x0, s0, alpha, beta, epsilon, Nmax, ud1, ud2);
+		// ZAKRES POPRAWNY: [-1, 1] zgodnie z PDF
+		double x_min = -1.0;
+		double x_max = 1.0;
 
-		std::cout << "\n--- Wyniki optymalizacji ---\n";
-		std::cout << Xopt;
+		// Otwórz plik CSV do zapisu wyników
+		ofstream results_file("wyniki_rosen_3x100.csv");
+		results_file << "Nr,s1,s2,x1_start,x2_start,x1_opt,x2_opt,f_opt,f_calls,flag\n";
 
-		std::cout << "\nKomentarz do flagi wyjscia:\n";
-		if (Xopt.flag == 2) {
-			std::cout << "Flaga 2: Algorytm zbiegl do rozwiazania z zadana dokladnoscia (max(|s_j|) < epsilon).\n";
+		std::cout << "\nPrzeprowadzanie 3x100 optymalizacji dla różnych długości kroku..." << std::endl;
+
+		for (int step_idx = 0; step_idx < num_steps; ++step_idx)
+		{
+			double s0_data[2] = { step_sizes[step_idx][0], step_sizes[step_idx][1] };
+			matrix s0(2, s0_data);
+
+			std::cout << "\n--- Długości kroku s = [" << s0(0) << ", " << s0(1) << "] ---" << std::endl;
+
+			int success_count = 0;
+			int global_min_count = 0;
+			double sum_f_calls = 0.0;
+			double sum_f_opt = 0.0;
+
+			for (int trial = 0; trial < num_trials; ++trial)
+			{
+				// Losowy punkt startowy z zakresu [-1, 1]
+				matrix x0 = rand_mat(2);
+				for (int i = 0; i < 2; ++i)
+					x0(i) = x_min + (x_max - x_min) * x0(i);
+
+				solution::clear_calls();
+				solution opt = Rosen(ff2T, x0, s0, alpha, beta, epsilon, Nmax, ud1, ud2);
+
+				// Zapisz wyniki do pliku
+				results_file << (trial + 1) << "," << s0(0) << "," << s0(1) << ","
+					<< x0(0) << "," << x0(1) << ","
+					<< opt.x(0) << "," << opt.x(1) << ","
+					<< opt.y(0) << "," << solution::f_calls << ","
+					<< opt.flag << "\n";
+
+				// Sprawdź czy znaleziono minimum globalne (f ≈ 0)
+				// Funkcja ff2T ma minimum globalne w okolicach f(x) = 0
+				if (opt.y(0) < 1e-3 && (opt.flag == 0 || opt.flag == 1 || opt.flag == 2))
+				{
+					global_min_count++;
+					sum_f_calls += solution::f_calls;
+					sum_f_opt += opt.y(0);
+				}
+
+				// Licz sukcesy ogólnie (nie tylko minimum globalne)
+				if (opt.flag == 0 || opt.flag == 1 || opt.flag == 2)
+				{
+					success_count++;
+				}
+
+				if ((trial + 1) % 20 == 0)
+					std::cout << "  Ukończono " << (trial + 1) << "/" << num_trials << " optymalizacji" << std::endl;
+			}
+
+			std::cout << "Wyniki dla s = [" << s0(0) << ", " << s0(1) << "]:" << std::endl;
+			std::cout << "  Udane optymalizacje: " << success_count << "/" << num_trials << std::endl;
+			std::cout << "  Minimum globalne: " << global_min_count << "/" << num_trials << std::endl;
+			if (global_min_count > 0)
+			{
+				std::cout << "  Średnia liczba wywołań funkcji celu: " << (sum_f_calls / global_min_count) << std::endl;
+				std::cout << "  Średnia wartość funkcji celu: " << (sum_f_opt / global_min_count) << std::endl;
+			}
 		}
-		else if (Xopt.flag == 0) {
-			std::cout << "Flaga 0: Przekroczono maksymalna liczbe wywolan funkcji celu (Nmax).\n";
-		}
-		else {
-			std::cout << "Flaga " << Xopt.flag << ": Nieznany status wyjscia.\n";
-		}
+
+		results_file.close();
+		std::cout << "\nWyniki zapisane do: wyniki_rosen_3x100.csv" << std::endl;
+
+		// Pojedyncza optymalizacja z zapisem trajektorii (dla wykresu poziomicowego)
+		std::cout << "\n--- Pojedyncza optymalizacja z zapisem trajektorii ---" << std::endl;
+
+		// Użyj punktu startowego z zakresu [-1, 1]
+		double x0_data[] = { 0.8, -0.8 };
+		matrix x0(2, x0_data);
+		double s0_data[] = { 0.5, 0.5 };
+		matrix s0(2, s0_data);
+
+		std::cout << "Punkt startowy: [" << x0(0) << ", " << x0(1) << "]" << std::endl;
+		std::cout << "Długość kroku: [" << s0(0) << ", " << s0(1) << "]" << std::endl;
+
+		solution::clear_calls();
+		solution opt = Rosen(ff2T, x0, s0, alpha, beta, epsilon, Nmax, ud1, ud2);
+
+		std::cout << "Wynik: x = [" << opt.x(0) << ", " << opt.x(1) << "], f(x) = " << opt.y(0) << std::endl;
+		std::cout << "Liczba wywołań funkcji celu: " << solution::f_calls << std::endl;
+		std::cout << "Flaga: " << opt.flag << std::endl;
+
+		// Tutaj należy dodać kod do zapisywania trajektorii poszukiwań
+		// (będzie wymagało modyfikacji funkcji Rosen() aby zwracała historię punktów)
 
 	}
 	catch (string ex_info)
 	{
-		std::cerr << "Wystapil blad w run_rosen_test():\n" << ex_info << "\n";
+		std::cerr << "Wystąpił błąd w lab2_rosen():\n" << ex_info << "\n";
 	}
 }
 
 void lab2_HJ()
 {
-	std::cout << "start lab2_HJ (Hooke-Jeeves)" << std::endl;
+	std::cout << "\n=== Lab2 HJ - Testowa funkcja celu (100 optymalizacji) ===" << std::endl;
 
-	// Punkt startowy dla funkcji 2D ff2T
-	double x0_data[] = { 0.5, 0.5 }; // punkt startowy
+	matrix ud1, ud2;
+	double epsilon = 1e-3;
+	int Nmax = 10000;
+	
+	// Trzy różne długości kroku
+	double step_sizes[] = { 0.1, 0.5, 1.0 };
+	int num_steps = 3;
+	int num_trials = 100;
+	
+	// Zakres dla losowych punktów startowych
+	double x_min = -2.0;
+	double x_max = 2.0;
+	
+	// Otwórz plik CSV do zapisu wyników
+	ofstream results_file("wyniki_100_optymalizacji.csv");
+	results_file << "Nr,s,x1_start,x2_start,x1_opt,x2_opt,f_opt,f_calls,flag\n";
+	
+	std::cout << "\nPrzeprowadzanie 100 optymalizacji dla kazdej dlugosci kroku..." << std::endl;
+	
+	for (int step_idx = 0; step_idx < num_steps; ++step_idx)
+	{
+		double s = step_sizes[step_idx];
+		double alpha = 0.5;
+		
+		std::cout << "\n--- Dlugosc kroku s = " << s << " ---" << std::endl;
+		
+		int success_count = 0;
+		double sum_f_calls = 0.0;
+		double sum_iterations = 0.0;
+		
+		for (int trial = 0; trial < num_trials; ++trial)
+		{
+			// Losowy punkt startowy
+			matrix x0 = rand_mat(2);
+			for (int i = 0; i < 2; ++i)
+				x0(i) = x_min + (x_max - x_min) * x0(i);
+			
+			solution::clear_calls();
+			solution opt = HJ(ff2T, x0, s, alpha, epsilon, Nmax, ud1, ud2);
+			
+			// Zapisz wyniki do pliku
+			results_file << (trial + 1) << "," << s << ","
+			            << x0(0) << "," << x0(1) << ","
+			            << opt.x(0) << "," << opt.x(1) << ","
+			            << opt.y(0) << "," << solution::f_calls << ","
+			            << opt.flag << "\n";
+			
+			// Sprawdź czy znaleziono minimum globalne (f ≈ 0)
+			if (opt.y(0) < 0.01 && opt.flag == 1)
+			{
+				success_count++;
+				sum_f_calls += solution::f_calls;
+			}
+			
+			if ((trial + 1) % 20 == 0)
+				std::cout << "  Ukończono " << (trial + 1) << "/" << num_trials << " optymalizacji" << std::endl;
+		}
+		
+		std::cout << "Wyniki dla s = " << s << ":" << std::endl;
+		std::cout << "  Sukces: " << success_count << "/" << num_trials << std::endl;
+		if (success_count > 0)
+		{
+			std::cout << "  Srednia liczba wywolan funkcji celu: " << (sum_f_calls / success_count) << std::endl;
+		}
+	}
+	
+	results_file.close();
+	std::cout << "\nWyniki zapisane do: wyniki_100_optymalizacji.csv" << std::endl;
+	
+	// Pojedyncza optymalizacja z zapisem trajektorii (dla wykresu)
+	std::cout << "\n--- Pojedyncza optymalizacja z zapisem trajektorii ---" << std::endl;
+	double x0_data[] = { 1.5, -1.5 };
+	matrix x0(2, x0_data);
+	double s = 0.5;
+	double alpha = 0.5;
+	
+	std::cout << "Punkt startowy: [" << x0(0) << ", " << x0(1) << "]" << std::endl;
+	
+	solution::clear_calls();
+	solution opt = HJ(ff2T, x0, s, alpha, epsilon, Nmax, ud1, ud2);
+	
+	std::cout << "Wynik: x = [" << opt.x(0) << ", " << opt.x(1) << "], f(x) = " << opt.y(0) << std::endl;
+	std::cout << "Liczba wywolan funkcji celu: " << solution::f_calls << std::endl;
+	std::cout << "Flaga: " << opt.flag << std::endl;
+}
+
+void lab2_robot()
+{
+	std::cout << "\n=== Lab2 Robot - Optymalizacja ramienia robota ===" << std::endl;
+	
+	// Test poprawności implementacji dla k1=5, k2=5
+	std::cout << "\n--- Test poprawnosci implementacji ---" << std::endl;
+	double test_k[] = { 5.0, 5.0 };
+	matrix x_test(2, test_k);
+	
+	// Wartości referencyjne
+	double ref_data[] = { M_PI, 0.0 }; // alpha_ref = π, omega_ref = 0
+	matrix ud1(2, ref_data);
+	matrix ud2; // nie używane w ff2R
+	
+	matrix Q_test = ff2R(x_test, ud1, ud2);
+	std::cout << "Q(k1=5, k2=5) = " << Q_test(0) << std::endl;
+	std::cout << "Oczekiwana wartosc: ~775.229" << std::endl;
+	
+	// Optymalizacja metodą Hooke-Jeeves - pojedyncza
+	std::cout << "\n--- Optymalizacja metoda Hooke-Jeeves (pojedyncza) ---" << std::endl;
+	
+	solution::clear_calls();
+	
+	// Punkt startowy z przedziału [0,20] x [0,20]
+	double x0_data[] = { 10.0, 10.0 }; // k1, k2
 	matrix x0(2, x0_data);
 	
-	double s = 0.5;        // długość kroku
+	double s = 1.0;        // długość kroku
 	double alpha = 0.5;    // współczynnik zmniejszania kroku
-	double epsilon = 1e-3; // dokładność
+	double epsilon = 1e-2; // dokładność
 	int Nmax = 10000;      // maksymalna liczba wywołań funkcji celu
-	matrix ud1, ud2;
-
-	solution opt = HJ(ff2T, x0, s, alpha, epsilon, Nmax, ud1, ud2);
-
-	std::cout << "Wynik HJ: x = [" << opt.x(0) << ", " << opt.x(1) << "], f(x) = " << opt.y(0) << ", flag = " << opt.flag << std::endl;
+	
+	std::cout << "Punkt startowy: k1 = " << x0(0) << ", k2 = " << x0(1) << std::endl;
+	std::cout << "Parametry: s = " << s << ", alpha = " << alpha << ", epsilon = " << epsilon << std::endl;
+	
+	solution opt = HJ(ff2R, x0, s, alpha, epsilon, Nmax, ud1, ud2);
+	
+	std::cout << "\n--- Wyniki optymalizacji ---" << std::endl;
+	std::cout << "Optymalne wspolczynniki wzmocnienia:" << std::endl;
+	std::cout << "  k1 = " << opt.x(0) << " Nm" << std::endl;
+	std::cout << "  k2 = " << opt.x(1) << " Nms" << std::endl;
+	std::cout << "Wartosc funkcjonalu jakosci: Q = " << opt.y(0) << std::endl;
 	std::cout << "Liczba wywolan funkcji celu: " << solution::f_calls << std::endl;
+	std::cout << "Flaga: " << opt.flag << " (1 = sukces, 0 = przekroczono Nmax)" << std::endl;
+	
+	// Symulacja dla optymalnych parametrów
+	std::cout << "\n--- Generowanie symulacji dla optymalnych parametrow ---" << std::endl;
+	
+	matrix Y0(2, 1);
+	Y0(0) = 0.0;  // alpha(0) = 0
+	Y0(1) = 0.0;  // omega(0) = 0
+	
+	matrix* Y = solve_ode(df2R, 0.0, 0.1, 100.0, Y0, ud1, opt.x);
+	
+	ofstream Sout("symulacja_robot.csv");
+	Sout << "t,alpha,omega\n";
+	int n = get_len(Y[0]);
+	for (int i = 0; i < n; ++i)
+	{
+		Sout << Y[0](i) << "," << Y[1](i, 0) << "," << Y[1](i, 1) << "\n";
+	}
+	Sout.close();
+	std::cout << "Wyniki symulacji zapisane do: symulacja_robot.csv" << std::endl;
+	
+	Y[0].~matrix();
+	Y[1].~matrix();
 }
 
 void lab3()
