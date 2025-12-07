@@ -1,5 +1,6 @@
 #include"opt_alg.h"
 #include"user_funs.h"
+#include<algorithm>
 
 solution MC(matrix(*ff)(matrix, matrix, matrix), int N, matrix lb, matrix ub, double epsilon, int Nmax, matrix ud1, matrix ud2)
 {
@@ -482,7 +483,39 @@ solution pen(matrix(*ff)(matrix, matrix, matrix), matrix x0, double c, double dc
 {
 	try {
 		solution Xopt;
-		//Tu wpisz kod funkcji
+		solution x_curr(x0);
+		double current_c = c;
+		matrix current_ud1 = ud1;
+
+		while (true)
+		{
+			// Update penalty coefficient in user data
+			// We assume ud1(0) is reserved for 'c'
+			current_ud1(0) = current_c;
+
+			// Run Simplex
+			// Parameters for NM: s=0.5 (initial step), alpha=1, beta=0.5, gamma=2, delta=0.5
+			double s = 0.5;
+			double alpha = 1.0, beta = 0.5, gamma = 2.0, delta = 0.5;
+
+			// We run NM with the current penalized function
+			solution x_next = sym_NM(ff, x_curr.x, s, alpha, beta, gamma, delta, epsilon, Nmax, current_ud1, ud2);
+
+			// Check convergence of the penalty loop
+			// If change in x is very small, we stop.
+			double diff = norm(x_next.x - x_curr.x);
+
+			x_curr = x_next;
+
+			if (diff < epsilon || solution::f_calls > Nmax)
+			{
+				Xopt = x_curr;
+				break;
+			}
+
+			// Increase penalty coefficient
+			current_c *= dc;
+		}
 
 		return Xopt;
 	}
@@ -497,7 +530,115 @@ solution sym_NM(matrix(*ff)(matrix, matrix, matrix), matrix x0, double s, double
 	try
 	{
 		solution Xopt;
-		//Tu wpisz kod funkcji
+		int n = get_dim(solution(x0));
+
+		// 1. Create initial simplex
+		// p[0] = x0
+		std::vector<solution> p;
+		p.push_back(solution(x0));
+		p[0].fit_fun(ff, ud1, ud2);
+
+		// p[i] = p[0] + s * ei
+		matrix I = ident_mat(n);
+		for (int i = 0; i < n; ++i)
+		{
+			solution new_pt(x0 + get_col(I, i) * s);
+			new_pt.fit_fun(ff, ud1, ud2);
+			p.push_back(new_pt);
+		}
+
+		while (true)
+		{
+			// 6. Sort vertices by function value
+			// p[0] is min (best), p[n] is max (worst)
+			std::sort(p.begin(), p.end(), [](const solution& a, const solution& b) {
+				return m2d(a.y) < m2d(b.y);
+			});
+
+			solution p_min = p[0];
+			solution p_max = p[n];
+			solution p_next_max = p[n - 1]; // Second worst
+
+			// Check stop criterion: max || p_min - p_i || < epsilon
+			bool stop = true;
+			for (int i = 1; i <= n; ++i)
+			{
+				if (norm(p[i].x - p_min.x) >= epsilon)
+				{
+					stop = false;
+					break;
+				}
+			}
+			if (stop || solution::f_calls >= Nmax)
+			{
+				Xopt = p_min;
+				Xopt.flag = (solution::f_calls >= Nmax) ? 0 : 1;
+				break;
+			}
+
+			// 8. Centroid of all except max
+			matrix sum_x(n, 1);
+			for (int i = 0; i < n; ++i) // sum 0 to n-1
+			{
+				sum_x = sum_x + p[i].x;
+			}
+			solution p_bar(sum_x * (1.0 / n));
+
+			// 9. Reflection
+			solution p_ref(p_bar.x + (p_bar.x - p_max.x) * alpha);
+			p_ref.fit_fun(ff, ud1, ud2);
+
+			if (m2d(p_ref.y) < m2d(p_min.y))
+			{
+				// 11. Expansion
+				solution p_exp(p_bar.x + (p_ref.x - p_bar.x) * gamma);
+				p_exp.fit_fun(ff, ud1, ud2);
+
+				if (m2d(p_exp.y) < m2d(p_ref.y))
+					p[n] = p_exp; // Accept expansion
+				else
+					p[n] = p_ref; // Accept reflection
+			}
+			else
+			{
+				if (m2d(p_ref.y) < m2d(p_next_max.y)) // Better than second worst?
+				{
+					p[n] = p_ref; // Accept reflection
+				}
+				else
+				{
+					// Contraction
+					solution p_con;
+					bool accepted_con = false;
+
+					if (m2d(p_ref.y) < m2d(p_max.y))
+					{
+						// Outside contraction (towards reflection)
+						p_con = solution(p_bar.x + (p_ref.x - p_bar.x) * beta);
+					}
+					else
+					{
+						// Inside contraction (towards max)
+						p_con = solution(p_bar.x + (p_max.x - p_bar.x) * beta);
+					}
+					p_con.fit_fun(ff, ud1, ud2);
+
+					if (m2d(p_con.y) < std::min(m2d(p_ref.y), m2d(p_max.y)))
+					{
+						p[n] = p_con;
+					}
+					else
+					{
+						// Reduction
+						for (int i = 1; i <= n; ++i)
+						{
+							p[i].x = p[0].x + (p[i].x - p[0].x) * delta;
+							p[i].fit_fun(ff, ud1, ud2);
+						}
+					}
+				}
+			}
+		}
 
 		return Xopt;
 	}
