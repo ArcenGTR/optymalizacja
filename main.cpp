@@ -29,7 +29,8 @@ int main()
 		//lab0();
 		//lab1();
 		//lab2();
-		lab3();
+		//lab3();
+		lab4();
 	}
 	catch (string EX_INFO)
 	{
@@ -560,8 +561,253 @@ void lab3()
 
 void lab4()
 {
+    // // Funkcja celu: f(x1, x2) = 1/6*x1^6 - 1.05*x1^4 + 2*x1^2 + x2^2 + x1*x2
+    //
+    // // Parametry symulacji
+    // const int N_TRIALS = 100;
+    // double epsilon = 1e-4;
+    // int Nmax = 1000;
+    // matrix ud1, ud2; // Puste dane u¿ytkownika
+    //
+    // // Ograniczenia dla punktu startowego: x1, x2 nale¿¹ do [-2, 2]
+    // matrix lb(2, 1, -2.0), ub(2, 1, 2.0);
+    // double range_x1 = ub(0) - lb(0); // 4.0
+    // double range_x2 = ub(1) - lb(1); // 4.0
+    //
+    // // Szukane minimum g³êbokie lokalne (wartoœæ f)
+    // // f* ? 0.298638 (dla x* ? [±1.7475, ?0.8737]^T)
+    // const double MINIMUM_TARGET = 0.298638;
+    // const double TOLERANCE = 0.001; // Tolerancja dla uznania, ¿e znaleziono minimum g³êbokie
+    //
+    // // Ustawienie ziarna losowoœci
+    // srand(time(NULL));
+    //
+    // // Struktura do zbierania statystyk dla ka¿dej serii 100 prób
+    // struct RunStats {
+    //     // Sumy dla wszystkich prób
+    //     double sum_x1_start = 0.0;
+    //     double sum_x2_start = 0.0;
+    //
+    //     // Sumy tylko dla UDANYCH optymalizacji (flag=1 i nie NaN)
+    //     double sum_x1_final = 0.0;
+    //     double sum_x2_final = 0.0;
+    //     double sum_y_final = 0.0;
+    //     long long sum_f_calls = 0;
+    //     long long sum_g_calls = 0;
+    //     long long sum_H_calls = 0;
+    //
+    //     // Liczniki
+    //     int total_runs = 0; // Zawsze 100
+    //     int successful_runs = 0; // Udane konwergencje (flag = 1 i nie NaN)
+    //     int global_min_count = 0; // Znalezione minimum g³êbokie (y* ? 0.298)
+    // };
+    //
+    // // --- 1. Generacja 100 punktów startowych (jednorazowo) ---
+    // std::vector<matrix> start_points(N_TRIALS);
+    // for (int t = 0; t < N_TRIALS; ++t) {
+    //     matrix x0(2, 1);
+    //     x0(0) = lb(0) + range_x1 * ((double)rand() / RAND_MAX);
+    //     x0(1) = lb(1) + range_x2 * ((double)rand() / RAND_MAX);
+    //     start_points[t] = x0;
+    // }
+    // std::cout << "Wygenerowano " << N_TRIALS << " losowych punktów startowych w zakresie [-2, 2].\n";
+    // // ------------------------------------------------------------------
+    //
+    // // Definicja metod i kroków
+    // std::vector<std::string> methods = {"SD", "CG", "Newton"};
+    // std::vector<double> steps = {0.05, 0.25, 0.0}; // 0.0 oznacza krok zmienny (Golden)
+    //
+    // // Otwarcie pliku do zapisu wyników
+    // ofstream results_file("lab4_results.csv");
+    // results_file << std::fixed << std::setprecision(6);
+    //
+    // // Nag³ówek w wymaganym formacie
+    // results_file << "Metoda;Dlugosc_kroku;x1_0;x2_0;x1_gwiazdka;x2_gwiazdka;y_gwiazdka;f_calls;g_calls;H_calls;Minimum_Globalne[TAK/NIE]\n";
+    //
+    // std::cout << "--- LAB 4: Symulacja Monte Carlo (" << N_TRIALS << " prób) ---\n";
+    //
+    // // --- G³ówny cykl: Iteracja po d³ugoœciach kroku ---
+    // for (double h : steps) {
+    //
+    //     // --- Wewnêtrzny cykl: Iteracja po metodach ---
+    //     for (const std::string& method : methods) {
+    //
+    //         RunStats stats; // Struktura do zbierania statystyk dla bie¿¹cej grupy (Metoda, Krok)
+    //
+    //         // --- Najbardziej wewnêtrzny cykl: Iteracja po 100 punktach startowych ---
+    //         for (int t = 0; t < N_TRIALS; ++t) {
+    //             matrix x0 = start_points[t]; // Pobranie wczeœniej wylosowanego punktu
+    //
+    //             stats.total_runs++;
+    //             stats.sum_x1_start += x0(0);
+    //             stats.sum_x2_start += x0(1);
+    //
+    //             solution::clear_calls();
+    //             solution opt;
+    //             bool error_occurred = false;
+    //
+    //             try {
+    //                 if (method == "SD") {
+    //                     opt = SD(ff5T, gf5T, x0, h, epsilon, Nmax, ud1, ud2);
+    //                 } else if (method == "CG") {
+    //                     opt = CG(ff5T, gf5T, x0, h, epsilon, Nmax, ud1, ud2);
+    //                 } else if (method == "Newton") {
+    //                     opt = Newton(ff5T, gf5T, Hf5T, x0, h, epsilon, Nmax, ud1, ud2);
+    //                 }
+    //
+    //                 // Sprawdzenie, czy optymalizacja by³a udana (flag=1) i wynik jest skoñczony (nie NaN)
+    //                 if (opt.flag != 1 || !std::isfinite(m2d(opt.y))) {
+    //                     error_occurred = true;
+    //                 }
+    //
+    //                 // Okreœlenie, czy znaleziono minimum globalne
+    //                 bool found_global = !error_occurred && std::fabs(m2d(opt.y) - MINIMUM_TARGET) < TOLERANCE;
+    //
+    //                 // --- Zbieranie statystyk dla udanych prób ---
+    //                 if (!error_occurred) {
+    //                     stats.successful_runs++;
+    //                     stats.sum_x1_final += opt.x(0);
+    //                     stats.sum_x2_final += opt.x(1);
+    //                     stats.sum_y_final += m2d(opt.y);
+    //                     stats.sum_f_calls += solution::f_calls;
+    //                     stats.sum_g_calls += solution::g_calls;
+    //                     stats.sum_H_calls += solution::H_calls;
+    //
+    //                     // Licznik znalezienia minimum globalnego
+    //                     if (found_global) {
+    //                         stats.global_min_count++;
+    //                     }
+    //                 }
+    //
+    //                 // Zapis wyników do pliku CSV
+    //                 results_file << method << ";" << h << ";"
+    //                              << x0(0) << ";" << x0(1) << ";"
+    //                              << (error_occurred ? "NaN" : std::to_string(opt.x(0))) << ";"
+    //                              << (error_occurred ? "NaN" : std::to_string(opt.x(1))) << ";"
+    //                              << (error_occurred ? "NaN" : std::to_string(m2d(opt.y))) << ";"
+    //                              << solution::f_calls << ";"
+    //                              << solution::g_calls << ";"
+    //                              << solution::H_calls << ";"
+    //                              << (found_global ? "TAK" : "NIE") << "\n";
+    //
+    //             } catch (string ex) {
+    //                 // Zapis b³êdu (np. b³¹d w inwersji macierzy)
+    //                 results_file << method << ";" << h << ";"
+    //                              << x0(0) << ";" << x0(1) << ";"
+    //                              << "Error;Error;Error;"
+    //                              << solution::f_calls << ";"
+    //                              << solution::g_calls << ";"
+    //                              << solution::H_calls << ";"
+    //                              << "NIE" << "\n";
+    //             }
+    //         } // Koniec 100 prób dla danego (Metoda, Krok)
+    //
+    //         // --- WYŒWIETLENIE ZBIORCZEJ STATYSTYKI DO KONSOLI ---
+    //
+    //         // Formatowanie wyœwietlania kroku
+    //         std::string h_str = (h == 0.0) ? "Zmienny (Z³oty Podzia³)" : std::to_string(h);
+    //
+    //         std::cout << std::fixed << std::setprecision(5);
+    //         std::cout << "\n======================================================\n";
+    //         std::cout << "PODSUMOWANIE STATYSTYCZNE\n";
+    //         std::cout << "Metoda: " << method << ", D³ugoœæ kroku (h): " << h_str << "\n";
+    //         std::cout << "Liczba prób (N): " << stats.total_runs << "\n";
+    //         std::cout << "Liczba udanych konwergencji: " << stats.successful_runs << "\n";
+    //         std::cout << "Liczba znalezionych minimów globalnych: " << stats.global_min_count << "\n";
+    //         std::cout << "------------------------------------------------------\n";
+    //
+    //         if (stats.total_runs > 0) {
+    //             std::cout << "Œrednia x1_0:         " << (stats.sum_x1_start / stats.total_runs) << "\n";
+    //             std::cout << "Œrednia x2_0:         " << (stats.sum_x2_start / stats.total_runs) << "\n";
+    //         }
+    //
+    //         if (stats.successful_runs > 0) {
+    //             std::cout << "\nŒREDNIE WYNIKI DLA UDANYCH OPTYMALIZACJI:\n";
+    //             std::cout << "Œrednia x1_gwiazdka:  " << (stats.sum_x1_final / stats.successful_runs) << "\n";
+    //             std::cout << "Œrednia x2_gwiazdka:  " << (stats.sum_x2_final / stats.successful_runs) << "\n";
+    //             std::cout << "Œrednia y_gwiazdka:   " << (stats.sum_y_final / stats.successful_runs) << "\n";
+    //             std::cout << "Œrednia f_calls:      " << (double)stats.sum_f_calls / stats.successful_runs << "\n";
+    //             std::cout << "Œrednia g_calls:      " << (double)stats.sum_g_calls / stats.successful_runs << "\n";
+    //             std::cout << "Œrednia H_calls:      " << (double)stats.sum_H_calls / stats.successful_runs << "\n";
+    //         } else {
+    //             std::cout << "Brak udanych konwergencji do obliczenia œrednich wyników.\n";
+    //         }
+    //         std::cout << "======================================================\n";
+    //         // -------------------------------------------------------------------
+    //
+    //     } // Koniec metod
+    // } // Koniec kroków
+    //
+    // results_file.close();
+    // std::cout << "\nSymulacja zakoñczona. Wyniki zapisano do lab4_results.csv" << endl;
 
+	double start_x1 = -1.1951;
+    double start_x2 = 0.666415;
+
+    // Punkt startowy
+    matrix x0(2, 1);
+    x0(0) = start_x1;
+    x0(1) = start_x2;
+
+    double epsilon = 1e-4;
+    int Nmax = 1000;
+    matrix ud1, ud2;
+
+    std::vector<std::string> methods = {"SD", "CG", "Newton"};
+    std::vector<double> steps = {0.05, 0.25, 0.0}; // 0.0 = zmienny krok
+
+    // Otwarcie pliku do zapisu trajektorii
+    ofstream trajectory_file("trajectory_all_steps.csv"); // Zmieniono nazwê pliku
+    trajectory_file << std::fixed << std::setprecision(8);
+
+    // Nag³ówek pliku CSV dla trajektorii
+    trajectory_file << "Metoda;Krok_h;Iteracja;x1;x2;y_val;f_calls;g_calls;H_calls\n";
+
+    std::cout << "\n--- LAB 6: Generowanie trajektorii dla x0 = [" << start_x1 << ", " << start_x2 << "] ---\n";
+
+    // Pêtla po metodach i krokach
+    for (double h : steps) {
+        for (const std::string& method : methods) {
+
+            solution::clear_calls();
+            solution opt;
+            bool error_occurred = false;
+
+            // --- ZAPIS PUNKTU STARTOWEGO (Iteracja 0) ---
+            trajectory_file << method << ";" << h << ";" << 0 << ";"
+                            << x0(0) << ";" << x0(1) << ";"
+                            << m2d(ff5T(x0, ud1, ud2)) << ";" // Obliczenie y dla x0
+                            << 0 << ";" << 0 << ";" << 0 << "\n";
+            // ------------------------------------------
+
+            try {
+                if (method == "SD") {
+                    opt = SD_Logged(ff5T, gf5T, x0, h, epsilon, Nmax, ud1, ud2, trajectory_file, method, h);
+                } else if (method == "CG") {
+                    opt = CG_Logged(ff5T, gf5T, x0, h, epsilon, Nmax, ud1, ud2, trajectory_file, method, h);
+                } else if (method == "Newton") {
+                    opt = Newton_Logged(ff5T, gf5T, Hf5T, x0, h, epsilon, Nmax, ud1, ud2, trajectory_file, method, h);
+                }
+
+                if (opt.flag == 1 && std::isfinite(m2d(opt.y))) {
+                    std::cout << "  Zapisano trajektoriê (sukces) dla: " << method << ", h=" << h << std::endl;
+                } else {
+                    error_occurred = true;
+                    std::cout << "  B£¥D/Niepowodzenie konwergencji dla: " << method << ", h=" << h << std::endl;
+                }
+
+            } catch (string ex) {
+                error_occurred = true;
+                std::cerr << "  Wyst¹pi³ wyj¹tek dla " << method << ", h=" << h << ": " << ex << std::endl;
+            }
+        }
+    }
+
+    trajectory_file.close();
+    std::cout << "\nZakoñczono generowanie pliku trajectory_all_steps.csv.\n";
+    std::cout << "PLIK ZAWIERA PE£NE TRAJEKTORIE DLA KA¯DEJ KONFIGURACJI.\n";
 }
+
 
 void lab5()
 {

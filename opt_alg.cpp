@@ -653,8 +653,52 @@ solution SD(matrix(*ff)(matrix, matrix, matrix), matrix(*gf)(matrix, matrix, mat
 	try
 	{
 		solution Xopt;
-		//Tu wpisz kod funkcji
+		solution x(x0); // Current point
+		solution x_prev(x0);
 
+		// Initial evaluation
+		x.fit_fun(ff, ud1, ud2);
+
+		while(true)
+		{
+			// 3. Compute gradient
+			matrix g = gf(x.x, ud1, ud2);
+			solution::g_calls++;
+
+			// Direction d = -gradient
+			matrix d = -g;
+
+			double h = h0;
+
+			// 4. Determine step size h
+			if (h0 == 0) // Variable step size using Golden Section
+			{
+				// Search range for h: [0, 1.0] (arbitrary, but sufficient for this problem)
+				solution h_sol = golden(ff5T_1D, 0.0, 1.0, epsilon, Nmax, x.x, d);
+				h = m2d(h_sol.x);
+			}
+
+			// 5. Update position
+			x_prev = x;
+			x.x = x.x + d * h;
+			x.fit_fun(ff, ud1, ud2);
+
+			// Check stops
+			if (solution::f_calls > Nmax || solution::g_calls > Nmax)
+			{
+				Xopt = x;
+				Xopt.flag = 0;
+				break;
+			}
+
+			// Stop criterion: ||x_i - x_i-1|| < epsilon
+			if (norm(x.x - x_prev.x) < epsilon)
+			{
+				Xopt = x;
+				Xopt.flag = 1;
+				break;
+			}
+		}
 		return Xopt;
 	}
 	catch (string ex_info)
@@ -668,8 +712,59 @@ solution CG(matrix(*ff)(matrix, matrix, matrix), matrix(*gf)(matrix, matrix, mat
 	try
 	{
 		solution Xopt;
-		//Tu wpisz kod funkcji
+		solution x(x0);
+		solution x_prev(x0);
 
+		x.fit_fun(ff, ud1, ud2);
+
+		matrix g = gf(x.x, ud1, ud2);
+		solution::g_calls++;
+
+		// Initial direction d(0) = -g(0)
+		matrix d = -g;
+		matrix g_prev = g;
+
+		while(true)
+		{
+			// Line Search / Step size
+			double h = h0;
+			if (h0 == 0)
+			{
+				solution h_sol = golden(ff5T_1D, 0.0, 1.0, epsilon, Nmax, x.x, d);
+				h = m2d(h_sol.x);
+			}
+
+			// Update x
+			x_prev = x;
+			x.x = x.x + d * h;
+			x.fit_fun(ff, ud1, ud2);
+
+			// Check Convergence
+			if (solution::f_calls > Nmax || solution::g_calls > Nmax)
+			{
+				Xopt = x;
+				Xopt.flag = 0;
+				break;
+			}
+			if (norm(x.x - x_prev.x) < epsilon)
+			{
+				Xopt = x;
+				Xopt.flag = 1;
+				break;
+			}
+
+			// Compute new gradient
+			g = gf(x.x, ud1, ud2);
+			solution::g_calls++;
+
+			// Calculate Beta (Fletcher-Reeves)
+			double beta = pow(norm(g), 2) / pow(norm(g_prev), 2);
+
+			// Update direction: d(i) = -g(i) + beta * d(i-1)
+			d = -g + d * beta;
+
+			g_prev = g;
+		}
 		return Xopt;
 	}
 	catch (string ex_info)
@@ -684,8 +779,46 @@ solution Newton(matrix(*ff)(matrix, matrix, matrix), matrix(*gf)(matrix, matrix,
 	try
 	{
 		solution Xopt;
-		//Tu wpisz kod funkcji
+		solution x(x0);
+		solution x_prev(x0);
 
+		x.fit_fun(ff, ud1, ud2);
+
+		while(true)
+		{
+			matrix g = gf(x.x, ud1, ud2);
+			solution::g_calls++;
+
+			matrix H = Hf(x.x, ud1, ud2);
+			solution::H_calls++;
+
+			// Direction: d = -H^-1 * g
+			matrix d = -inv(H) * g;
+
+			double h = h0;
+			if (h0 == 0)
+			{
+				solution h_sol = golden(ff5T_1D, 0.0, 1.0, epsilon, Nmax, x.x, d);
+				h = m2d(h_sol.x);
+			}
+
+			x_prev = x;
+			x.x = x.x + d * h;
+			x.fit_fun(ff, ud1, ud2);
+
+			if (solution::f_calls > Nmax || solution::g_calls > Nmax) // or H_calls
+			{
+				Xopt = x;
+				Xopt.flag = 0;
+				break;
+			}
+			if (norm(x.x - x_prev.x) < epsilon)
+			{
+				Xopt = x;
+				Xopt.flag = 1;
+				break;
+			}
+		}
 		return Xopt;
 	}
 	catch (string ex_info)
@@ -699,8 +832,57 @@ solution golden(matrix(*ff)(matrix, matrix, matrix), double a, double b, double 
 	try
 	{
 		solution Xopt;
-		//Tu wpisz kod funkcji
+		double alpha = (sqrt(5.0) - 1.0) / 2.0;
 
+		double a_i = a;
+		double b_i = b;
+		double c_i = b_i - alpha * (b_i - a_i);
+		double d_i = a_i + alpha * (b_i - a_i);
+
+		solution Xc{matrix(c_i)};
+		Xc.fit_fun(ff, ud1, ud2);
+
+		solution Xd{matrix(d_i)};
+		Xd.fit_fun(ff, ud1, ud2);
+
+		while(true)
+		{
+			if (solution::f_calls > Nmax)
+			{
+				Xopt = Xc;
+				Xopt.flag = 0;
+				break;
+			}
+
+			if (m2d(Xc.y) < m2d(Xd.y))
+			{
+				b_i = d_i;
+				d_i = c_i;
+				Xd = Xc;
+
+				c_i = b_i - alpha * (b_i - a_i);
+				Xc = solution(matrix(c_i)); // Tutaj przypisanie jest bezpieczne
+				Xc.fit_fun(ff, ud1, ud2);
+			}
+			else
+			{
+				a_i = c_i;
+				c_i = d_i;
+				Xc = Xd;
+
+				d_i = a_i + alpha * (b_i - a_i);
+				Xd = solution(matrix(d_i)); // Tutaj przypisanie jest bezpieczne
+				Xd.fit_fun(ff, ud1, ud2);
+			}
+
+			if ((b_i - a_i) < epsilon)
+			{
+				Xopt.x = (a_i + b_i) / 2.0;
+				Xopt.fit_fun(ff, ud1, ud2);
+				Xopt.flag = 1;
+				break;
+			}
+		}
 		return Xopt;
 	}
 	catch (string ex_info)
@@ -708,6 +890,238 @@ solution golden(matrix(*ff)(matrix, matrix, matrix), double a, double b, double 
 		throw ("solution golden(...):\n" + ex_info);
 	}
 }
+
+
+
+solution SD_Logged(matrix(*ff)(matrix, matrix, matrix), matrix(*gf)(matrix, matrix, matrix), matrix x0, double h0, double epsilon, int Nmax, matrix ud1, matrix ud2, ofstream& trajectory_file, const std::string& method_name, double h_val)
+{
+    try
+    {
+       solution Xopt;
+       solution x(x0); // Current point
+       solution x_prev(x0);
+       int iter = 0; // Dodano licznik iteracji
+
+       // Pocz¹tkowa ewaluacja (wartoœæ y dla x0 zosta³a ju¿ zapisana w lab6_trajectory)
+       x.fit_fun(ff, ud1, ud2);
+       // UWAGA: Nie logujemy tutaj, bo iteracja 0 jest ju¿ zalogowana w lab6_trajectory
+
+       while(true)
+       {
+          iter++; // Licznik iteracji
+
+          // 3. Obliczenie gradientu
+          matrix g = gf(x.x, ud1, ud2);
+          solution::g_calls++;
+
+          // Kierunek d = -gradient
+          matrix d = -g;
+
+          double h = h0;
+
+          // 4. Okreœlenie d³ugoœci kroku h
+          if (h0 == 0) // Zmienny krok (Golden Section)
+          {
+             // Za³o¿enie: golden(ff5T_1D, ...) jest dostêpne
+             solution h_sol = golden(ff5T_1D, 0.0, 1.0, epsilon, Nmax, x.x, d);
+             h = m2d(h_sol.x);
+          }
+
+          // 5. Aktualizacja pozycji
+          x_prev = x;
+          x.x = x.x + d * h;
+          x.fit_fun(ff, ud1, ud2); // W tym miejscu inkrementowane jest solution::f_calls
+
+          // --- LOGOWANIE TEJ ITERACJI ---
+          trajectory_file << method_name << ";" << h_val << ";" << iter << ";"
+                          << x.x(0) << ";" << x.x(1) << ";"
+                          << m2d(x.y) << ";"
+                          << solution::f_calls << ";"
+                          << solution::g_calls << ";"
+                          << solution::H_calls << "\n";
+          // -----------------------------
+
+          // Kryteria stopu
+          if (solution::f_calls > Nmax || solution::g_calls > Nmax)
+          {
+             Xopt = x;
+             Xopt.flag = 0;
+             break;
+          }
+
+          // Kryterium stopu: ||x_i - x_i-1|| < epsilon
+          if (norm(x.x - x_prev.x) < epsilon)
+          {
+             Xopt = x;
+             Xopt.flag = 1;
+             break;
+          }
+       }
+       return Xopt;
+    }
+    catch (string ex_info)
+    {
+       throw ("solution SD_Logged(...):\n" + ex_info);
+    }
+}
+
+solution CG_Logged(matrix(*ff)(matrix, matrix, matrix), matrix(*gf)(matrix, matrix, matrix), matrix x0, double h0, double epsilon, int Nmax, matrix ud1, matrix ud2, ofstream& trajectory_file, const std::string& method_name, double h_val)
+{
+    try
+    {
+       solution Xopt;
+       solution x(x0);
+       solution x_prev(x0);
+       int iter = 0; // Dodano licznik iteracji
+
+       x.fit_fun(ff, ud1, ud2);
+
+       matrix g = gf(x.x, ud1, ud2);
+       solution::g_calls++;
+
+       // Pocz¹tkowy kierunek d(0) = -g(0)
+       matrix d = -g;
+       matrix g_prev = g;
+
+       while(true)
+       {
+          iter++; // Licznik iteracji
+
+          // Liniowe wyszukiwanie / D³ugoœæ kroku
+          double h = h0;
+          if (h0 == 0)
+          {
+             solution h_sol = golden(ff5T_1D, 0.0, 1.0, epsilon, Nmax, x.x, d);
+             h = m2d(h_sol.x);
+          }
+
+          // Aktualizacja x
+          x_prev = x;
+          x.x = x.x + d * h;
+          x.fit_fun(ff, ud1, ud2);
+
+          // --- LOGOWANIE TEJ ITERACJI ---
+          trajectory_file << method_name << ";" << h_val << ";" << iter << ";"
+                          << x.x(0) << ";" << x.x(1) << ";"
+                          << m2d(x.y) << ";"
+                          << solution::f_calls << ";"
+                          << solution::g_calls << ";"
+                          << solution::H_calls << "\n";
+          // -----------------------------
+
+          // Kryteria konwergencji
+          if (solution::f_calls > Nmax || solution::g_calls > Nmax)
+          {
+             Xopt = x;
+             Xopt.flag = 0;
+             break;
+          }
+          if (norm(x.x - x_prev.x) < epsilon)
+          {
+             Xopt = x;
+             Xopt.flag = 1;
+             break;
+          }
+
+          // Obliczenie nowego gradientu
+          g = gf(x.x, ud1, ud2);
+          solution::g_calls++;
+
+          // Obliczenie Beta (Fletcher-Reeves)
+          double beta = pow(norm(g), 2) / pow(norm(g_prev), 2);
+
+          // Aktualizacja kierunku: d(i) = -g(i) + beta * d(i-1)
+          d = -g + d * beta;
+
+          g_prev = g;
+       }
+       return Xopt;
+    }
+    catch (string ex_info)
+    {
+       throw ("solution CG_Logged(...):\n" + ex_info);
+    }
+}
+
+solution Newton_Logged(matrix(*ff)(matrix, matrix, matrix), matrix(*gf)(matrix, matrix, matrix),
+    matrix(*Hf)(matrix, matrix, matrix), matrix x0, double h0, double epsilon, int Nmax, matrix ud1, matrix ud2, ofstream& trajectory_file, const std::string& method_name, double h_val)
+{
+    try
+    {
+       solution Xopt;
+       solution x(x0);
+       solution x_prev(x0);
+       int iter = 0; // Dodano licznik iteracji
+
+       x.fit_fun(ff, ud1, ud2);
+
+       while(true)
+       {
+       	iter++;
+
+       	matrix g = gf(x.x, ud1, ud2);
+       	solution::g_calls++;
+
+       	matrix H = Hf(x.x, ud1, ud2);
+       	solution::H_calls++;
+
+       	// 1. Kierunek: d = -H^-1 * g
+       	matrix d = -inv(H) * g;
+
+       	// ----------------------------------------------------
+       	// >>> OSTATECZNA POPRAWKA BLOKU REGULARYZACJI KIERUNKU <<<
+       	// Poprawne u¿ycie funkcji trans() z pliku matrix.cpp
+       	if (m2d(trans(g) * d) >= 0) { // U¿ycie trans(g)
+       		// Kierunek d nie jest kierunkiem zstêpu (descent).
+       		// Stosujemy kierunek Najszybszego Spadku.
+       		d = -g;
+       	}
+       	// ----------------------------------------------------
+
+       	double h = h0;
+       	if (h0 == 0)
+       	{
+       		// 2. Liniowe wyszukiwanie (Z³oty Podzia³)
+       		solution h_sol = golden(ff5T_1D, 0.0, 1.0, epsilon, Nmax, x.x, d);
+       		h = m2d(h_sol.x);
+       	}
+
+       	x_prev = x;
+       	x.x = x.x + d * h;
+       	x.fit_fun(ff, ud1, ud2);
+
+
+          // --- LOGOWANIE TEJ ITERACJI ---
+          trajectory_file << method_name << ";" << h_val << ";" << iter << ";"
+                          << x.x(0) << ";" << x.x(1) << ";"
+                          << m2d(x.y) << ";"
+                          << solution::f_calls << ";"
+                          << solution::g_calls << ";"
+                          << solution::H_calls << "\n";
+          // -----------------------------
+
+          if (solution::f_calls > Nmax || solution::g_calls > Nmax) // lub H_calls
+          {
+             Xopt = x;
+             Xopt.flag = 0;
+             break;
+          }
+          if (norm(x.x - x_prev.x) < epsilon)
+          {
+             Xopt = x;
+             Xopt.flag = 1;
+             break;
+          }
+       }
+       return Xopt;
+    }
+    catch (string ex_info)
+    {
+       throw ("solution Newton_Logged(...):\n" + ex_info);
+    }
+}
+
+
 
 solution Powell(matrix(*ff)(matrix, matrix, matrix), matrix x0, double epsilon, int Nmax, matrix ud1, matrix ud2)
 {

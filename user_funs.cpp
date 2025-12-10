@@ -323,7 +323,6 @@ matrix df4(double t, matrix Y, matrix ud1, matrix ud2)
 	return dY;
 }
 
-// Objective function for Lab 4
 matrix ff4R(matrix x, matrix ud1, matrix ud2)
 {
 	// Decision variables: x(0) = v0x, x(1) = omega
@@ -404,5 +403,52 @@ matrix ff4R(matrix x, matrix ud1, matrix ud2)
 	if (g_path > 0) pen += pow(g_path, 2);
 
 	return matrix(objective + c * pen);
+}
+
+matrix ff5T(matrix x, matrix ud1, matrix ud2)
+{
+	double x1 = x(0);
+	double x2 = x(1);
+	// f(x) = 1/6 x1^6 - 1.05 x1^4 + 2 x1^2 + x2^2 + x1*x2
+	double y = (1.0 / 6.0) * pow(x1, 6) - 1.05 * pow(x1, 4) + 2.0 * pow(x1, 2) + pow(x2, 2) + x1 * x2;
+	return matrix(y);
+}
+
+matrix gf5T(matrix x, matrix ud1, matrix ud2)
+{
+	double x1 = x(0);
+	double x2 = x(1);
+	matrix g(2, 1);
+	// df/dx1 = x1^5 - 4.2 x1^3 + 4 x1 + x2
+	g(0) = pow(x1, 5) - 4.2 * pow(x1, 3) + 4.0 * x1 + x2;
+	// df/dx2 = 2 x2 + x1
+	g(1) = 2.0 * x2 + x1;
+	return g;
+}
+
+matrix Hf5T(matrix x, matrix ud1, matrix ud2)
+{
+	double x1 = x(0);
+	double x2 = x(1);
+	matrix H(2, 2);
+	// d2f/dx1^2 = 5 x1^4 - 12.6 x1^2 + 4
+	H(0, 0) = 5.0 * pow(x1, 4) - 12.6 * pow(x1, 2) + 4.0;
+	// d2f/dx1dx2 = 1
+	H(0, 1) = 1.0;
+	// d2f/dx2dx1 = 1
+	H(1, 0) = 1.0;
+	// d2f/dx2^2 = 2
+	H(1, 1) = 2.0;
+	return H;
+}
+
+// Helper function for Golden Section Line Search
+// We want to minimize f(x + h * d) with respect to h.
+// ud1 = x_current, ud2 = direction d
+matrix ff5T_1D(matrix h, matrix ud1, matrix ud2)
+{
+	// ud1 is x(i), ud2 is d(i)
+	matrix x_next = ud1 + ud2 * h(0);
+	return ff5T(x_next, ud1, ud2);
 }
 

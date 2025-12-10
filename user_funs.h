@@ -14,6 +14,10 @@ matrix ff2T(matrix x, matrix ud1, matrix ud2);
 matrix ff3T(matrix x, matrix ud1, matrix ud2);
 matrix ff4R(matrix x, matrix ud1, matrix ud2);
 matrix df4(double t, matrix Y, matrix ud1, matrix ud2);
+matrix ff5T(matrix x, matrix ud1, matrix ud2);
+matrix gf5T(matrix x, matrix ud1, matrix ud2);
+matrix Hf5T(matrix x, matrix ud1, matrix ud2);
+matrix ff5T_1D(matrix h, matrix ud1, matrix ud2);
 
 
 
