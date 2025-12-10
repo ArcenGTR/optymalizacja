@@ -63,4 +63,5 @@ matrix get_col(const matrix&, int); // throw (string);
 matrix get_row(const matrix&, int); // throw (string);
 ostream& operator<<(ostream&, const matrix&);
 istream& operator>>(istream&, matrix&); // throw (string);
+matrix read_data_matrix(const char* filename, int rows, int cols);
 

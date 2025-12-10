@@ -741,73 +741,181 @@ void lab4()
     // results_file.close();
     // std::cout << "\nSymulacja zakoñczona. Wyniki zapisano do lab4_results.csv" << endl;
 
-	double start_x1 = -1.1951;
-    double start_x2 = 0.666415;
 
-    // Punkt startowy
-    matrix x0(2, 1);
-    x0(0) = start_x1;
-    x0(1) = start_x2;
 
+	// double start_x1 = -1.1951;
+ //    double start_x2 = 0.666415;
+ //
+ //    // Punkt startowy
+ //    matrix x0(2, 1);
+ //    x0(0) = start_x1;
+ //    x0(1) = start_x2;
+ //
+ //    double epsilon = 1e-4;
+ //    int Nmax = 1000;
+ //    matrix ud1, ud2;
+ //
+ //    std::vector<std::string> methods = {"SD", "CG", "Newton"};
+ //    std::vector<double> steps = {0.05, 0.25, 0.0}; // 0.0 = zmienny krok
+ //
+ //    // Otwarcie pliku do zapisu trajektorii
+ //    ofstream trajectory_file("trajectory_all_steps.csv"); // Zmieniono nazwê pliku
+ //    trajectory_file << std::fixed << std::setprecision(8);
+ //
+ //    // Nag³ówek pliku CSV dla trajektorii
+ //    trajectory_file << "Metoda;Krok_h;Iteracja;x1;x2;y_val;f_calls;g_calls;H_calls\n";
+ //
+ //    std::cout << "\n--- LAB 6: Generowanie trajektorii dla x0 = [" << start_x1 << ", " << start_x2 << "] ---\n";
+ //
+ //    // Pêtla po metodach i krokach
+ //    for (double h : steps) {
+ //        for (const std::string& method : methods) {
+ //
+ //            solution::clear_calls();
+ //            solution opt;
+ //            bool error_occurred = false;
+ //
+ //            // --- ZAPIS PUNKTU STARTOWEGO (Iteracja 0) ---
+ //            trajectory_file << method << ";" << h << ";" << 0 << ";"
+ //                            << x0(0) << ";" << x0(1) << ";"
+ //                            << m2d(ff5T(x0, ud1, ud2)) << ";" // Obliczenie y dla x0
+ //                            << 0 << ";" << 0 << ";" << 0 << "\n";
+ //            // ------------------------------------------
+ //
+ //            try {
+ //                if (method == "SD") {
+ //                    opt = SD_Logged(ff5T, gf5T, x0, h, epsilon, Nmax, ud1, ud2, trajectory_file, method, h);
+ //                } else if (method == "CG") {
+ //                    opt = CG_Logged(ff5T, gf5T, x0, h, epsilon, Nmax, ud1, ud2, trajectory_file, method, h);
+ //                } else if (method == "Newton") {
+ //                    opt = Newton_Logged(ff5T, gf5T, Hf5T, x0, h, epsilon, Nmax, ud1, ud2, trajectory_file, method, h);
+ //                }
+ //
+ //                if (opt.flag == 1 && std::isfinite(m2d(opt.y))) {
+ //                    std::cout << "  Zapisano trajektoriê (sukces) dla: " << method << ", h=" << h << std::endl;
+ //                } else {
+ //                    error_occurred = true;
+ //                    std::cout << "  B£¥D/Niepowodzenie konwergencji dla: " << method << ", h=" << h << std::endl;
+ //                }
+ //
+ //            } catch (string ex) {
+ //                error_occurred = true;
+ //                std::cerr << "  Wyst¹pi³ wyj¹tek dla " << method << ", h=" << h << ": " << ex << std::endl;
+ //            }
+ //        }
+ //    }
+ //
+ //    trajectory_file.close();
+ //    std::cout << "\nZakoñczono generowanie pliku trajectory_all_steps.csv.\n";
+ //    std::cout << "PLIK ZAWIERA PE£NE TRAJEKTORIE DLA KA¯DEJ KONFIGURACJI.\n";
+
+
+
+	std::cout << "\n--- Regresja Logistyczna (Tylko CG) ---\n";
+
+    // 1. Wczytanie danych
+    matrix X_data;
+    matrix Y_data;
+    try {
+        // X: 3x100 (theta0, x1, x2)
+        X_data = read_data_matrix("XData.txt", 3, 100);
+        // Y: 1x100
+        Y_data = read_data_matrix("YData.txt", 1, 100);
+
+    } catch (const std::string& ex) {
+        std::cerr << "B£¥D: Nie mo¿na wczytaæ plików XData.txt lub YData.txt:\n" << ex << std::endl;
+        return;
+    }
+
+    // Dane dla algorytmu optymalizacyjnego
+    matrix x0(3, 1, 0.0); // Wektor startowy theta(0) = [0, 0, 0]^T
     double epsilon = 1e-4;
-    int Nmax = 1000;
-    matrix ud1, ud2;
+    int Nmax = 10000;
+    matrix ud_X = X_data; // Dane u¿ytkownika 1 (X)
+    matrix ud_Y = Y_data; // Dane u¿ytkownika 2 (Y)
 
-    std::vector<std::string> methods = {"SD", "CG", "Newton"};
-    std::vector<double> steps = {0.05, 0.25, 0.0}; // 0.0 = zmienny krok
+    // Konfiguracje optymalizacji (Tylko CG, wymagane kroki sta³e)
+    std::vector<std::string> methods = {"CG"};
+    std::vector<double> steps = {0.01, 0.001, 0.0001};
 
-    // Otwarcie pliku do zapisu trajektorii
-    ofstream trajectory_file("trajectory_all_steps.csv"); // Zmieniono nazwê pliku
-    trajectory_file << std::fixed << std::setprecision(8);
+    // Nag³ówek dla Tabeli 3 (na konsolê)
+    std::cout << std::fixed << std::setprecision(8);
+    std::cout << "\n-----------------------------------------------------------------------------------------------------------------\n";
+    std::cout << "| Metoda | Krok_h | J(theta*) | P(theta*) [%] | f_calls | g_calls | H_calls | theta0 | theta1 | theta2 |\n";
+    std::cout << "-----------------------------------------------------------------------------------------------------------------\n";
 
-    // Nag³ówek pliku CSV dla trajektorii
-    trajectory_file << "Metoda;Krok_h;Iteracja;x1;x2;y_val;f_calls;g_calls;H_calls\n";
+    solution best_opt;
+    double best_accuracy = 0.0;
+    std::string best_case_info;
+    int best_g_calls = 0; // Zmienna do przechowania liczby wywo³añ gradientu dla najlepszego przypadku
 
-    std::cout << "\n--- LAB 6: Generowanie trajektorii dla x0 = [" << start_x1 << ", " << start_x2 << "] ---\n";
-
-    // Pêtla po metodach i krokach
     for (double h : steps) {
         for (const std::string& method : methods) {
 
             solution::clear_calls();
             solution opt;
-            bool error_occurred = false;
-
-            // --- ZAPIS PUNKTU STARTOWEGO (Iteracja 0) ---
-            trajectory_file << method << ";" << h << ";" << 0 << ";"
-                            << x0(0) << ";" << x0(1) << ";"
-                            << m2d(ff5T(x0, ud1, ud2)) << ";" // Obliczenie y dla x0
-                            << 0 << ";" << 0 << ";" << 0 << "\n";
-            // ------------------------------------------
 
             try {
-                if (method == "SD") {
-                    opt = SD_Logged(ff5T, gf5T, x0, h, epsilon, Nmax, ud1, ud2, trajectory_file, method, h);
-                } else if (method == "CG") {
-                    opt = CG_Logged(ff5T, gf5T, x0, h, epsilon, Nmax, ud1, ud2, trajectory_file, method, h);
-                } else if (method == "Newton") {
-                    opt = Newton_Logged(ff5T, gf5T, Hf5T, x0, h, epsilon, Nmax, ud1, ud2, trajectory_file, method, h);
+                // Uruchomienie metody CG
+                if (method == "CG") {
+                    opt = CG(ff_logistic, gf_logistic, x0, h, epsilon, Nmax, ud_X, ud_Y);
                 }
 
-                if (opt.flag == 1 && std::isfinite(m2d(opt.y))) {
-                    std::cout << "  Zapisano trajektoriê (sukces) dla: " << method << ", h=" << h << std::endl;
+                if (opt.flag == 1) {
+                    double accuracy = classification_accuracy(opt.x, X_data, Y_data);
+
+                    // Standardowy wydruk do tabeli
+                    std::cout << "| " << std::setw(6) << method << " | " << std::setw(6) << h << " | "
+                              << m2d(opt.y) << " | " << std::setw(11) << accuracy << " | "
+                              << std::setw(7) << solution::f_calls << " | " << std::setw(7) << solution::g_calls << " | "
+                              << std::setw(7) << solution::H_calls << " | "
+                              << opt.x(0) << " | " << opt.x(1) << " | " << opt.x(2) << " |\n";
+
+                    // Znajdowanie i zapisywanie najlepszego przypadku
+                    if (accuracy > best_accuracy) {
+                        best_accuracy = accuracy;
+                        best_opt = opt;
+                        best_case_info = method + ", h=" + std::to_string(h);
+                        best_g_calls = solution::g_calls; // KLUCZOWE: Zapisujemy g_calls
+                    }
                 } else {
-                    error_occurred = true;
-                    std::cout << "  B£¥D/Niepowodzenie konwergencji dla: " << method << ", h=" << h << std::endl;
+                     std::cout << "| " << std::setw(6) << method << " | " << std::setw(6) << h << " | BRAK KONWERGENCJI (flaga=" << opt.flag << ") |\n";
                 }
 
-            } catch (string ex) {
-                error_occurred = true;
+            } catch (std::string ex) {
                 std::cerr << "  Wyst¹pi³ wyj¹tek dla " << method << ", h=" << h << ": " << ex << std::endl;
             }
         }
     }
+    std::cout << "-----------------------------------------------------------------------------------------------------------------\n";
 
-    trajectory_file.close();
-    std::cout << "\nZakoñczono generowanie pliku trajectory_all_steps.csv.\n";
-    std::cout << "PLIK ZAWIERA PE£NE TRAJEKTORIE DLA KA¯DEJ KONFIGURACJI.\n";
+    // Wyœwietlenie w wymaganym, skondensowanym formacie
+    if (best_opt.flag == 1) {
+        double t0 = best_opt.x(0);
+        double t1 = best_opt.x(1);
+        double t2 = best_opt.x(2);
+        double cost = m2d(best_opt.y);
+
+        // Wymagany format: theta0_*, theta1_*, theta2_*, J(theta_*), P(theta_*), g_calls
+        std::cout << "\n\n" << std::fixed << std::setprecision(8)
+                  << t0 << ", "
+                  << t1 << ", "
+                  << t2 << ", "
+                  << cost << ", "
+                  << best_accuracy << ", "
+                  << best_g_calls << "\n";
+
+        // Dodatkowy wydruk granicy klasyfikacji (dla sprawdzenia)
+        std::cout << "\nNajlepszy przypadek: " << best_case_info << ", Dok³adnoœæ: " << best_accuracy << "%\n";
+        std::cout << "Równanie granicy klasyfikacji (do naniesienia na wykres, h_theta(x) = 0.5):\n";
+
+        if (std::abs(t2) > 1e-8) {
+             std::cout << "x2 = - (" << t0 << " + " << t1 << " * x1) / " << t2 << "\n";
+        } else {
+             std::cout << "x2 = (NIEMO¯LIWE DO OBLICZENIA) Theta2 jest bliskie zeru. \n";
+        }
+    }
 }
-
 
 void lab5()
 {

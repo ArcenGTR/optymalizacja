@@ -18,7 +18,9 @@ matrix ff5T(matrix x, matrix ud1, matrix ud2);
 matrix gf5T(matrix x, matrix ud1, matrix ud2);
 matrix Hf5T(matrix x, matrix ud1, matrix ud2);
 matrix ff5T_1D(matrix h, matrix ud1, matrix ud2);
-
+matrix ff_logistic(matrix theta, matrix X_data, matrix Y_data);
+matrix gf_logistic(matrix theta, matrix X_data, matrix Y_data);
+double classification_accuracy(const matrix& theta, const matrix& X_data, const matrix& Y_data);
 
 
 

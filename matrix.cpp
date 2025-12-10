@@ -617,3 +617,25 @@ int get_len(const matrix& A)
 		throw string("int get_len(const matrix&):\ndlugosc jest zwracana tylko dla wektorow pionowych");
 	return A.n;
 }
+
+matrix read_data_matrix(const char* filename, int rows, int cols)
+{
+	std::ifstream file(filename);
+	if (!file.is_open()) {
+		throw std::string("read_data_matrix: Nie mozna otworzyc pliku: ") + filename;
+	}
+
+	// Inicjalizacja macierzy z oczekiwanymi wymiarami.
+	// Przeci¹¿ony operator>> w matrix.cpp odczyta dane do tej wstêpnie zaalokowanej macierzy.
+	matrix M(rows, cols);
+
+	file >> M;
+
+	// Sprawdzenie, czy odczyt siê powiód³
+	if (file.fail() && !file.eof()) {
+		throw std::string("read_data_matrix: Blad odczytu danych z pliku (niepoprawny format lub braki).") + filename;
+	}
+
+	file.close();
+	return M;
+}

@@ -452,3 +452,85 @@ matrix ff5T_1D(matrix h, matrix ud1, matrix ud2)
 	return ff5T(x_next, ud1, ud2);
 }
 
+matrix ff_logistic(matrix theta, matrix X_data, matrix Y_data)
+{
+	// Pobranie liczby danych ucz¹cych (m)
+	int m = get_size(X_data)[1];
+	double cost = 0.0;
+
+	for (int i = 0; i < m; ++i)
+	{
+		// Wyodrêbnienie i-tego przyk³adu
+		matrix x_i = get_col(X_data, i); // x_i jest 3x1
+		double y_i = m2d(Y_data(0, i));  // y_i jest 0 lub 1
+
+		// Obliczenie hipotezy h_theta(x_i) = 1 / (1 + e^(-theta^T * x_i))
+		// theta^T * x_i jest macierz¹ 1x1
+		double z = -m2d(trans(theta) * x_i);
+		double h_i = 1.0 / (1.0 + exp(z));
+
+		// Obliczenie wk³adu do funkcji kosztu (Log Loss)
+		// W celu unikniêcia log(0) nale¿y stosowaæ minimaln¹ wartoœæ numeryczn¹ epsilon,
+		// ale zak³adamy, ¿e w macierz.h/pow.h jest bezpieczna implementacja log.
+		cost += y_i * log(h_i) + (1.0 - y_i) * log(1.0 - h_i);
+	}
+
+	// Wynik to macierz 1x1
+	return matrix(-1.0 / m * cost);
+}
+
+matrix gf_logistic(matrix theta, matrix X_data, matrix Y_data)
+{
+	int m = get_size(X_data)[1]; // Liczba danych ucz¹cych
+	matrix gradient(3, 1, 0.0);  // Wektor gradientu (3x1) zainicjowany zerami
+
+	for (int i = 0; i < m; ++i)
+	{
+		matrix x_i = get_col(X_data, i);
+		double y_i = m2d(Y_data(0, i));
+
+		// Obliczenie hipotezy h_theta(x_i)
+		double z = -m2d(trans(theta) * x_i);
+		double h_i = 1.0 / (1.0 + exp(z));
+
+		// Obliczenie b³êdu (h_theta(x_i) - y_i)
+		double error = h_i - y_i;
+
+		// Dodanie wk³adu do gradientu: (error * x_i)
+		// Mno¿enie skalara (error) przez wektor (x_i)
+		gradient = gradient + x_i * error;
+	}
+
+	// Uœrednienie: (1/m) * suma
+	return gradient * (1.0 / m);
+}
+
+// Funkcja do obliczania procentowej poprawnoœci klasyfikacji
+double classification_accuracy(const matrix& theta, const matrix& X_data, const matrix& Y_data)
+{
+	int m = get_size(X_data)[1];
+	int correct_predictions = 0;
+
+	for (int i = 0; i < m; ++i)
+	{
+		matrix x_i = get_col(X_data, i);
+		double y_i = m2d(Y_data(0, i));
+
+		// Obliczenie h_theta(x_i)
+		double z = -m2d(trans(theta) * x_i);
+		double h_i = 1.0 / (1.0 + exp(z));
+
+		// Klasyfikacja: Przyjêty (1) jeœli h_i >= 0.5, Odrzucony (0) jeœli h_i < 0.5
+		int predicted_y = (h_i >= 0.5) ? 1 : 0;
+
+		// Sprawdzenie, czy predykcja jest poprawna
+		if (predicted_y == (int)y_i)
+		{
+			correct_predictions++;
+		}
+	}
+
+	// Zwrócenie procentowej dok³adnoœci
+	return (double)correct_predictions / m * 100.0;
+}
+
