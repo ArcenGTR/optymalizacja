@@ -1126,16 +1126,85 @@ solution Newton_Logged(matrix(*ff)(matrix, matrix, matrix), matrix(*gf)(matrix, 
 solution Powell(matrix(*ff)(matrix, matrix, matrix), matrix x0, double epsilon, int Nmax, matrix ud1, matrix ud2)
 {
 	try
-	{
-		solution Xopt;
-		//Tu wpisz kod funkcji
+    {
+        solution Xopt;
+        solution x(x0);
+        int n = get_dim(x);
+        matrix D = ident_mat(n); // Step 2: Initialize directions as identity matrix
+        solution::clear_calls(); // Reset counters
 
-		return Xopt;
-	}
-	catch (string ex_info)
-	{
-		throw ("solution Powell(...):\n" + ex_info);
-	}
+        // We use a specialized 1D function wrapper that expects:
+        // ud1 = current point x, ud2 = direction d.
+        // The actual function ff is effectively ff5R (via ff5R_1D).
+
+        while (true) // Step 3: repeat
+        {
+            matrix p0 = x.x; // Step 4: p0 = x(i)
+
+            // Step 5: for j = 1 to n
+            for (int j = 0; j < n; ++j)
+            {
+                matrix dj = get_col(D, j);
+
+                // Step 6: Determine h_j (Line Search)
+                // We use expansion to find a bracket, then golden to find min
+                double* range = expansion(ff5R_1D, 0.0, 1.0, 2.0, Nmax, x.x, dj);
+                solution h_sol = golden(ff5R_1D, range[0], range[1], epsilon, Nmax, x.x, dj);
+                double h = m2d(h_sol.x);
+                delete[] range;
+
+                // Step 7: p_j = p_{j-1} + h*d_j (Update x immediately)
+                x.x = x.x + dj * h;
+            }
+
+            // Step 9: Check convergence ||pn - p0|| < epsilon
+            if (norm(x.x - p0) < epsilon || solution::f_calls > Nmax)
+            {
+                Xopt = x;
+                Xopt.fit_fun(ff, ud1, ud2);
+                Xopt.flag = (solution::f_calls > Nmax) ? 0 : 1;
+                break; // Step 10: return x*
+            }
+
+            // Step 12-14: Shift directions
+            // d_j = d_{j+1} for j=1 to n-1
+            for (int j = 0; j < n - 1; ++j)
+            {
+                matrix next_d = get_col(D, j + 1);
+                D.set_col(next_d, j);
+            }
+
+            // Step 15: d_n = p_n - p_0
+            matrix dn = x.x - p0;
+
+            // Step 16: Determine h_{n+1} (Line Search along new direction)
+            double* range = expansion(ff5R_1D, 0.0, 1.0, 2.0, Nmax, x.x, dn);
+            solution h_sol = golden(ff5R_1D, range[0], range[1], epsilon, Nmax, x.x, dn);
+            double h = m2d(h_sol.x);
+            delete[] range;
+
+            // Step 17: p_{n+1} = p_n + h * d_{n+1} -> x_new
+            x.x = x.x + dn * h;
+
+            // Update direction set: D col n-1 becomes dn
+            D.set_col(dn, n - 1);
+
+            // Step 20: until f_calls > Nmax
+            if (solution::f_calls > Nmax)
+            {
+                Xopt = x;
+                Xopt.fit_fun(ff, ud1, ud2);
+                Xopt.flag = 0;
+                break;
+            }
+        }
+
+        return Xopt;
+    }
+    catch (string ex_info)
+    {
+        throw ("solution Powell(...):\n" + ex_info);
+    }
 }
 
 solution EA(matrix(*ff)(matrix, matrix, matrix), int N, matrix lb, matrix ub, int mi, int lambda, matrix sigma0, double epsilon, int Nmax, matrix ud1, matrix ud2)

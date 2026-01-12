@@ -534,3 +534,97 @@ double classification_accuracy(const matrix& theta, const matrix& X_data, const 
 	return (double)correct_predictions / m * 100.0;
 }
 
+static matrix LAB5_PARAMS(2, 1);
+
+void set_lab5_params(double a, double w)
+{
+	LAB5_PARAMS(0) = a;
+	LAB5_PARAMS(1) = w;
+}
+
+double calculate_f1(matrix x, double a)
+{
+	double x1 = x(0);
+	double x2 = x(1);
+	return a * (pow(x1 - 3.0, 2) + pow(x2 - 3.0, 2));
+}
+
+double calculate_f2(matrix x, double a)
+{
+	double x1 = x(0);
+	double x2 = x(1);
+	return (1.0 / a) * (pow(x1 + 3.0, 2) + pow(x2 + 3.0, 2));
+}
+
+matrix ff5R(matrix x, matrix ud1, matrix ud2)
+{
+	// Retrieve parameters from static storage
+	double a = LAB5_PARAMS(0);
+	double w = LAB5_PARAMS(1);
+
+	double f1 = calculate_f1(x, a);
+	double f2 = calculate_f2(x, a);
+
+	// Weighted Sum
+	double F = w * f1 + (1.0 - w) * f2;
+	return matrix(F);
+}
+
+matrix ff5R_1D(matrix h, matrix ud1, matrix ud2)
+{
+	double step = h(0);
+	matrix x_next = ud1 + ud2 * step;
+
+	return ff5R(x_next, NAN, NAN);
+}
+
+double get_f1(matrix x, double a)
+{
+	return a * (pow(x(0) - 3.0, 2) + pow(x(1) - 3.0, 2));
+}
+
+// ?????????? f2
+double get_f2(matrix x, double a)
+{
+	return (1.0 / a) * (pow(x(0) + 3.0, 2) + pow(x(1) + 3.0, 2));
+}
+
+const double P = 2000.0;        // N
+const double E = 120e9;         // Pa
+const double rho = 8920.0;      // kg/m^3
+const double u_max = 0.0025;    // m
+const double sigma_max = 300e6; // Pa
+
+matrix ff5(matrix x, matrix ud1, matrix ud2)
+{
+
+	// GUARD (KRYTYCZNE)
+	if (x(0) <= 0.0 || x(1) <= 0.0)
+		return matrix(1e12);
+
+	double c = m2d(ud1);
+	double w = m2d(ud2);
+
+	double l = x(0);   // m
+	double d = x(1);   // m
+
+	double m = rho * M_PI * d*d/4.0 * l;
+	double u = 64.0 * P * pow(l,3) / (3.0 * E * M_PI * pow(d,4));
+	double s = 32.0 * P * l / (M_PI * pow(d,3));
+
+	double f1 = m / 5.0;
+	double f2 = u / 0.05;
+
+	double f = w*f1 + (1.0-w)*f2;
+
+	double penalty = 0.0;
+
+	if (l < 0.2)  penalty += pow(0.2 - l, 2);
+	if (l > 1.0)  penalty += pow(l - 1.0, 2);
+	if (d < 0.01) penalty += pow(0.01 - d, 2);
+	if (d > 0.05) penalty += pow(d - 0.05, 2);
+	if (u > u_max) penalty += pow(u - u_max, 2);
+	if (s > sigma_max) penalty += pow(s - sigma_max, 2);
+
+	return matrix(f + c * penalty);
+}

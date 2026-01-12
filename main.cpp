@@ -30,7 +30,8 @@ int main()
 		//lab1();
 		//lab2();
 		//lab3();
-		lab4();
+		//lab4();
+		lab5();
 	}
 	catch (string EX_INFO)
 	{
@@ -917,10 +918,121 @@ void lab4()
     }
 }
 
+// void lab5() {
+//     std::cout << "--- LAB 5: Optymalizacja Wielokryterialna (101 punktów) ---" << std::endl;
+//
+//     double epsilon = 1e-3;
+//     int Nmax = 2000;
+//     int N_POINTS = 101; // dla w = {0, 0.01, ..., 1.0}
+//     double A_values[] = { 1.0, 10.0, 100.0 };
+//
+//     // --- 1. Generacja 101 sta³ych punktów startowych ---
+//     std::vector<matrix> start_points(N_POINTS);
+//     for (int i = 0; i < N_POINTS; ++i) {
+//         matrix x0(2, 1);
+//         x0(0) = -10.0 + 20.0 * ((double)rand() / RAND_MAX); // Zakres [-10, 10]
+//         x0(1) = -10.0 + 20.0 * ((double)rand() / RAND_MAX);
+//         start_points[i] = x0;
+//     }
+//     std::cout << "Wygenerowano " << N_POINTS << " punktów startowych.\n";
+//
+//     // Otwarcie pliku
+//     std::ofstream results("lab5_results.csv");
+//     results << "a;w;x1_0;x2_0;x1_opt;x2_opt;f1;f2;F_weighted;f_calls\n";
+//     results << std::fixed << std::setprecision(6);
+//
+//     // --- 2. G³ówny cykl po parametrze A ---
+//     for (double a : A_values) {
+//         std::cout << "Przetwarzanie a = " << a << "..." << std::endl;
+//
+//         // --- 3. Cykl po wagach W (u¿ywaj¹c tych samych punktów startowych) ---
+//         for (int i = 0; i < N_POINTS; ++i) {
+//             double w = i / 100.0;
+//             matrix x0 = start_points[i]; // Pobranie sta³ego punktu dla danej wagi
+//
+//             set_lab5_params(a, w);
+//             solution::clear_calls();
+//
+//             try {
+//                 // Wywo³anie metody Powella (implementacja w opt_alg.cpp powinna byæ zgodna z pseudokodem)
+//                 solution opt = Powell(ff5R, x0, epsilon, Nmax, matrix(NAN), matrix(NAN));
+//
+//                 double f1_val = get_f1(opt.x, a);
+//                 double f2_val = get_f2(opt.x, a);
+//                 double F_val = m2d(opt.y);
+//
+//                 // Zapis do CSV
+//                 results << a << ";" << w << ";"
+//                     << x0(0) << ";" << x0(1) << ";"
+//                     << opt.x(0) << ";" << opt.x(1) << ";"
+//                     << f1_val << ";" << f2_val << ";"
+//                     << F_val << ";" << solution::f_calls << "\n";
+//
+//
+//             }
+//             catch (std::string ex) {
+//                 results << a << ";" << w << ";" << x0(0) << ";" << x0(1) << ";Error;Error;Error;Error;Error;0\n";
+//             }
+//         }
+//     }
+//
+//     results.close();
+//     std::cout << "Zakoñczono. Wyniki zapisano w lab5_results.csv" << std::endl;
+// }
+
+const double P = 2000.0;        // N
+const double E = 120e9;         // Pa
+const double rho = 8920.0;      // kg/m^3
+const double u_max = 0.0025;    // m
+const double sigma_max = 300e6; // Pa
+
 void lab5()
 {
+	ofstream results("lab5.csv");
+	results << "w;l0;d0;l;d;f_calls\n";
 
+	double epsilon = 1e-4;
+	int Nmax = 5000;
+
+	srand(time(NULL));
+
+	for (double w = 0.0; w <= 1.01; w += 0.01)
+	{
+		matrix ud1(1);
+		ud1(0) = 1e6;          // WSPÓ£CZYNNIK KARY
+
+		matrix ud2(1);
+		ud2(0) = w;            // WAGA KRYTERIUM
+
+		matrix x0(2,1);
+
+		// LOSOWANIE (metry!)
+		x0(0) = ((rand() % 801) + 200) / 1000.0;  // l ? <0.2, 1.0>
+		x0(1) = ((rand() % 41)  + 10)  / 1000.0;  // d ? <0.01, 0.05>
+
+		solution result = Powell(
+			ff5R,
+			x0,
+			epsilon,
+			Nmax,
+			ud1,
+			ud2
+		);
+
+		results
+			<< w << ";"
+			<< x0(0) << ";"
+			<< x0(1) << ";"
+			<< result.x(0) << ";"
+			<< result.x(1) << ";"
+			<< solution::f_calls << "\n";
+
+		solution::clear_calls();
+	}
+
+	results.close();
 }
+
 
 void lab6()
 {
