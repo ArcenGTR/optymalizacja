@@ -1,6 +1,7 @@
 #include"opt_alg.h"
 #include"user_funs.h"
 #include<algorithm>
+#include<random>
 
 solution MC(matrix(*ff)(matrix, matrix, matrix), int N, matrix lb, matrix ub, double epsilon, int Nmax, matrix ud1, matrix ud2)
 {
@@ -1207,17 +1208,125 @@ solution Powell(matrix(*ff)(matrix, matrix, matrix), matrix x0, double epsilon, 
     }
 }
 
+
+
+#include <random>
+
+// Globalny generator
+static std::random_device rd;
+static std::mt19937 gen(rd());
+
+double randn() {
+	std::normal_distribution<double> d(0, 1);
+	return d(gen);
+}
+
+double randd() {
+	std::uniform_real_distribution<double> d(0, 1);
+	return d(gen);
+}
+
+// Zmienione nazwy, by unikn¹æ konfliktu "ambiguous call"
+matrix random_matrix(int n) {
+	matrix res(n, 1);
+	std::uniform_real_distribution<double> d(0, 1);
+	for (int i = 0; i < n; ++i) res(i, 0) = d(gen);
+	return res;
+}
+
+matrix randn_matrix(int n) {
+	matrix res(n, 1);
+	std::normal_distribution<double> d(0, 1);
+	for (int i = 0; i < n; ++i) res(i, 0) = d(gen);
+	return res;
+}
+
 solution EA(matrix(*ff)(matrix, matrix, matrix), int N, matrix lb, matrix ub, int mi, int lambda, matrix sigma0, double epsilon, int Nmax, matrix ud1, matrix ud2)
 {
-	try
-	{
-		solution Xopt;
-		//Tu wpisz kod funkcji
+    try {
+        solution::clear_calls();
+        double alpha = pow(N, -0.5);
+        double beta = pow(2 * N, -0.25);
 
-		return Xopt;
-	}
-	catch (string ex_info)
-	{
-		throw ("solution EA(...):\n" + ex_info);
-	}
+        // 1. Inicjalizacja populacji
+        solution* P = new solution[mi];
+        for (int i = 0; i < mi; ++i) {
+            P[i].x = matrix(N, 1);
+            for (int k = 0; k < N; ++k)
+                P[i].x(k) = lb(k) + (ub(k) - lb(k)) * randd();
+            P[i].ud = sigma0;
+            P[i].fit_fun(ff, ud1, ud2);
+        }
+
+        solution Xopt = P[0];
+
+        while (solution::f_calls < Nmax) {
+            // 2. Selekcja turniejowa (Ko³o ruletki)
+            double* phi = new double[mi];
+            double Phi_sum = 0;
+            for (int j = 0; j < mi; ++j) {
+                phi[j] = 1.0 / (m2d(P[j].y) + 1e-12);
+                Phi_sum += phi[j];
+            }
+            double* q = new double[mi + 1];
+            q[0] = 0;
+            for (int j = 1; j <= mi; ++j) q[j] = q[j - 1] + phi[j - 1] / Phi_sum;
+
+            double a = randn();
+            solution* T = new solution[lambda];
+
+            for (int j = 0; j < lambda; ++j) {
+                // Wybór rodziców
+                int idxA = 0, idxB = 0;
+                double r1 = randd(), r2 = randd();
+                for (int k = 1; k <= mi; ++k) {
+                    if (r1 > q[k - 1] && r1 <= q[k]) idxA = k - 1;
+                    if (r2 > q[k - 1] && r2 <= q[k]) idxB = k - 1;
+                }
+
+                // 3. Krzy¿owanie
+                double r = randd();
+                T[j].x = matrix(N, 1);
+                for (int k = 0; k < N; ++k)
+                    T[j].x(k) = P[idxA].x(k) * r + P[idxB].x(k) * (1.0 - r);
+
+                double sigma_avg = m2d(P[idxA].ud) * r + m2d(P[idxB].ud) * (1.0 - r);
+
+                // 4. Mutacja (z pilnowaniem ograniczeñ)
+                double b_rand = randn();
+                T[j].ud = sigma_avg * exp(alpha * a + beta * b_rand);
+                double s = m2d(T[j].ud);
+
+                for (int k = 0; k < N; ++k) {
+                    T[j].x(k) = T[j].x(k) + s * randn();
+                    // Bariery
+                    if (T[j].x(k) < lb(k)) T[j].x(k) = lb(k);
+                    if (T[j].x(k) > ub(k)) T[j].x(k) = ub(k);
+                }
+                T[j].fit_fun(ff, ud1, ud2);
+            }
+
+            // 5. Selekcja (mi + lambda) - Najlepsze przechodz¹ dalej
+            solution* total_pop = new solution[mi + lambda];
+            for (int k = 0; k < mi; ++k) total_pop[k] = P[k];
+            for (int k = 0; k < lambda; ++k) total_pop[mi + k] = T[k];
+
+            for (int k = 0; k < mi + lambda - 1; ++k) {
+                for (int m = 0; m < mi + lambda - k - 1; ++m) {
+                    if (m2d(total_pop[m].y) > m2d(total_pop[m + 1].y))
+                        std::swap(total_pop[m], total_pop[m + 1]);
+                }
+            }
+
+            for (int k = 0; k < mi; ++k) P[k] = total_pop[k];
+            Xopt = P[0];
+
+            delete[] phi; delete[] q; delete[] T; delete[] total_pop;
+
+            if (m2d(Xopt.y) < epsilon) break;
+        }
+        delete[] P;
+        return Xopt;
+    }
+    catch (string ex) { throw ("EA error: " + ex); }
 }

@@ -31,7 +31,8 @@ int main()
 		//lab2();
 		//lab3();
 		//lab4();
-		lab5();
+		//lab5();
+		lab6();
 	}
 	catch (string EX_INFO)
 	{
@@ -1033,8 +1034,175 @@ void lab5()
 	results.close();
 }
 
+double avg_val(double sum, int count) {
+	return (count > 0) ? sum / count : 0.0;
+}
+
+matrix wczytajDane(string nazwaPliku, int wiersze, int kolumny)
+{
+	// Tworzymy macierz docelow¹: kolumny pliku staj¹ siê wierszami macierzy (2x1001)
+	// Dziêki temu data(0, i) to zawsze x1, a data(1, i) to zawsze x2
+	matrix dane(kolumny, wiersze);
+	ifstream plik(nazwaPliku);
+
+	if (!plik.is_open())
+	{
+		throw string("Nie udalo sie otworzyc pliku: " + nazwaPliku);
+	}
+
+	double t, x1, x2;
+	for (int i = 0; i < wiersze; ++i)
+	{
+		// Zak³adamy format pliku: czas x1 x2
+		if (!(plik >> t >> x1 >> x2))
+		{
+			break; // Zabezpieczenie przed przedwczesnym koñcem pliku
+		}
+
+		dane(0, i) = x1; // Pierwsza kolumna danych (x1) trafia do 0. wiersza macierzy
+		dane(1, i) = x2; // Druga kolumna danych (x2) trafia do 1. wiersza macierzy
+	}
+
+	plik.close();
+	return dane;
+}
 
 void lab6()
 {
 
+    double sigmas[] = { 0.01, 0.1, 1, 10, 100 };
+    matrix lb(2, 1, -5.0), ub(2, 1, 5.0);
+    int mu = 20, lambda = 40;
+    double epsilon = 1e-4;
+    int Nmax = 10000;
+
+    ofstream t1("tabela1.csv");
+    t1 << "Sigma;Proba;x1;x2;f(x);f_calls;Sukces\n";
+
+    cout << "Rozpoczynanie obliczen..." << endl;
+    // Nag³ówek dopasowany do Twojego screena z dodanymi kolumnami x1, x2
+    cout << "Sigma     | Sukcesy | Sr. x1    | Sr. x2    | Sr. f(x)  | Sr. f_calls" << endl;
+    cout << "--------------------------------------------------------------------------" << endl;
+
+    for (double s : sigmas)
+    {
+        double sum_x1 = 0, sum_x2 = 0, sum_f = 0, sum_calls = 0;
+        int success_count = 0;
+        matrix s_mat(s);
+
+        for (int i = 0; i < 100; ++i)
+        {
+            solution res = EA(ff6T, 2, lb, ub, mu, lambda, s_mat, epsilon, Nmax, NAN, NAN);
+
+            // Kryterium sukcesu: f(x) < 0.1 (blisko minimum globalnego)
+            bool success = (m2d(res.y) < 0.1);
+
+            // Tabela 1: wszystkie próby
+            t1 << s << ";" << i + 1 << ";" << res.x(0) << ";" << res.x(1) << ";"
+               << m2d(res.y) << ";" << solution::f_calls << ";" << (success ? 1 : 0) << "\n";
+
+            if (success)
+            {
+                sum_x1 += res.x(0);
+                sum_x2 += res.x(1);
+                sum_f += m2d(res.y);
+                sum_calls += solution::f_calls;
+                success_count++;
+            }
+        }
+
+        // Tabela 2: Wypisywanie œrednich tylko dla sukcesów
+        cout << fixed << setprecision(4) << left << setw(10) << s << "| "
+             << right << setw(3) << success_count << "/100 | "
+             << setw(10) << (success_count > 0 ? sum_x1 / success_count : 0.0) << "| "
+             << setw(10) << (success_count > 0 ? sum_x2 / success_count : 0.0) << "| "
+             << setw(10) << (success_count > 0 ? sum_f / success_count : 0.0) << "| "
+             << setw(10) << (success_count > 0 ? sum_calls / success_count : 0.0) << endl;
+    }
+
+    t1.close();
+    cout << "--------------------------------------------------------------------------" << endl;
+
+
+	/*
+	// 1. Wczytanie danych doœwiadczalnych (polozenia.txt)
+    // Plik powinien mieæ 3 kolumny: t, x1, x2
+	double sigma_tab[] = { 0.01, 0.1, 1, 10, 100 };
+	int N = 2;
+	int mi = 20;
+	int lambda = 40;
+	double epsilon = 1e-5;
+	int Nmax = 10000;
+
+	matrix lb(N, 1);
+	lb(0) = -5;
+	lb(1) = -5;
+
+	matrix ub(N, 1);
+	ub(0) = 5;
+	ub(1) = 5;
+
+	//teoretyczna
+	std::ofstream Sout1("symulacja_lab6_teoretyczny.csv");
+
+	Sout1 << "Sigma;i;x1;x2;f(x);Liczba_wywolan" << endl;
+
+	for(double sigmy : sigma_tab)
+	{
+		for (int i = 0; i < 100; i++)
+		{
+			solution result = EA(ff6T, N, lb, ub, mi, lambda, sigmy, epsilon, Nmax);
+
+			Sout1 << sigmy << ";"
+				  << (i + 1) << ";"
+				  << result.x(0) << ";"
+				  << result.x(1) << ";"
+				  << result.y(0) << ";"
+				  << solution::f_calls << endl;
+
+			solution::clear_calls();
+		}
+	}
+	Sout1.close();
+	cout << "Zapisano wyniki teoretyczne do 'symulacja_lab6_teoretyczny.csv'." << endl;
+
+
+	//rzeczywiste
+	matrix data = wczytajDane("polozenia.txt", 1001, 2);
+
+	lb = matrix(2, 1, 0.1);
+	ub = matrix(2, 1, 3);
+
+	cout << "Rozpoczynam optymalizacje problemu rzeczywistego..." << endl;
+
+	solution result = EA(ff6R, N, lb, ub, mi, lambda, matrix(2, 1, 1), 1e-2, Nmax, 1001, data);
+	solution::clear_calls();
+
+	cout << "Znaleziono parametry b1=" << result.x(0) << ", b2=" << result.x(1) << endl;
+
+	matrix Y0(4, 1);
+
+	matrix* Y = solve_ode(df6R, 0, 0.1, 100, Y0, NAN, result.x);
+
+	std::ofstream Sout("symulacja_lab6_rzeczywisty.csv");
+
+	Sout << "Czas;x1_sym;x2_sym;x1_exp;x2_exp" << endl;
+
+	int steps = 1001;
+	for (int i = 0; i < steps; i++)
+	{
+		double t = i * 0.1;
+		Sout << t << ";"
+			 << Y[1](i, 0) << ";"
+			 << Y[1](i, 2) << ";"
+			 << data(i, 0) << ";"
+			 << data(i, 1) << endl;
+	}
+
+	Sout.close();
+	cout << "Zapisano wyniki symulacji do 'symulacja_lab6_rzeczywisty.csv'." << endl;
+	*/
+
 }
+
+
